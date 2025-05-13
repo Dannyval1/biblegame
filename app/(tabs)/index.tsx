@@ -1,75 +1,107 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import SettingsModal from "@/components/SettingsModal";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import { Link } from "expo-router";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
 export default function HomeScreen() {
+  const [settingsVisible, setSettingsVisible] = useState(false);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
+    <ThemedView style={styles.container}>
+      <View style={styles.content}>
+        <ThemedText type="title" style={styles.title}>
+          Biblia Trivia Game
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
+        <ThemedText style={styles.subtitle}>
+          ¡Pon a prueba tu conocimiento bíblico!
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+
+        <Link href="/quiz" asChild>
+          <Pressable style={styles.button}>
+            <ThemedText style={styles.buttonText}>Jugar</ThemedText>
+          </Pressable>
+        </Link>
+        <Link href="/" asChild>
+          <Pressable style={styles.button}>
+            <ThemedText style={styles.buttonText}>Ranking</ThemedText>
+          </Pressable>
+        </Link>
+        <Link href="/profile" asChild>
+          <Pressable style={styles.button}>
+            <ThemedText style={styles.buttonText}>Perfil</ThemedText>
+          </Pressable>
+        </Link>
+        <Pressable
+          style={styles.button}
+          onPress={() => setSettingsVisible(true)}
+        >
+          <ThemedText style={styles.buttonText}>Configuración</ThemedText>
+        </Pressable>
+
+        <View style={styles.statsContainer}>
+          <ThemedText style={styles.statsText}>
+            📖 Preguntas del Antiguo y Nuevo Testamento
+          </ThemedText>
+          <ThemedText style={styles.statsText}>
+            ⏱️ Tiempo por pregunta
+          </ThemedText>
+          <ThemedText style={styles.statsText}>
+            🎯 Múltiples niveles de dificultad
+          </ThemedText>
+        </View>
+      </View>
+      <SettingsModal
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
+  content: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 18,
+    marginBottom: 40,
+    color: "#666",
+    textAlign: "center",
+  },
+  button: {
+    backgroundColor: "#2D4B8E",
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    marginBottom: 40,
+    width: 250,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  statsContainer: {
+    alignItems: "center",
+  },
+  statsText: {
+    fontSize: 16,
     marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+    color: "#777",
   },
 });

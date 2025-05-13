@@ -1,0 +1,242 @@
+[
+  {
+    "id": 11,
+    "category": "Antiguo Testamento",
+    "question": "¿Cuántos días tomó a Dios crear el mundo según Génesis?",
+    "options": ["5 días", "6 días", "7 días", "8 días"],
+    "correctAnswer": 1,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 12,
+    "category": "Antiguo Testamento",
+    "question": "¿Quién fue el primer hijo de Adán y Eva?",
+    "options": ["Caín", "Abel", "Set", "Enoc"],
+    "correctAnswer": 0,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 13,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué apóstol era recolector de impuestos antes de seguir a Jesús?",
+    "options": ["Mateo", "Juan", "Andrés", "Felipe"],
+    "correctAnswer": 0,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 14,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué milagro realizó Jesús en las bodas de Caná?",
+    "options": ["Sanó un ciego", "Convirtió agua en vino", "Resucitó a Lázaro", "Caminó sobre el agua"],
+    "correctAnswer": 1,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 15,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué soñó José que se inclinaban ante él?",
+    "options": ["Estrellas", "Ángeles", "Gavillas de trigo", "Montañas"],
+    "correctAnswer": 2,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 16,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué escribió Pilato en la cruz de Jesús?",
+    "options": ["Rey de los Judíos", "Este es el Mesías", "Inocente", "Salvador del Mundo"],
+    "correctAnswer": 0,
+    "difficulty": "Difícil"
+  },
+  {
+    "id": 17,
+    "category": "Antiguo Testamento",
+    "question": "¿Cuál fue la primera plaga de Egipto?",
+    "options": ["Sangre en el Nilo", "Ranas", "Piojos", "Oscuridad"],
+    "correctAnswer": 0,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 18,
+    "category": "Nuevo Testamento",
+    "question": "¿Quién fue traicionado por un beso?",
+    "options": ["Pablo", "Esteban", "Pedro", "Jesús"],
+    "correctAnswer": 3,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 19,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué juez derrotó a los madianitas con 300 hombres?",
+    "options": ["Sansón", "Gedeón", "Jefté", "Otoniel"],
+    "correctAnswer": 1,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 20,
+    "category": "Nuevo Testamento",
+    "question": "¿Cuántos panes usó Jesús para alimentar a los 5000?",
+    "options": ["3", "5", "7", "12"],
+    "correctAnswer": 1,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 21,
+    "category": "Antiguo Testamento",
+    "question": "¿Quién interpretó el sueño de Nabucodonosor?",
+    "options": ["Ezequiel", "Jeremías", "Daniel", "Isaías"],
+    "correctAnswer": 2,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 22,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué apóstol dudó de la resurrección?",
+    "options": ["Tomás", "Judas Iscariote", "Santiago", "Bartolomé"],
+    "correctAnswer": 0,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 23,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué rey escribió la mayoría de los Proverbios?",
+    "options": ["David", "Salomón", "Saúl", "Ezequías"],
+    "correctAnswer": 1,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 24,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué personaje fue arrebatado al tercer cielo según Pablo?",
+    "options": ["Juan", "El mismo Pablo", "Pedro", "Esteban"],
+    "correctAnswer": 1,
+    "difficulty": "Difícil"
+  },
+  {
+    "id": 25,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué profeta fue llevado al cielo en un carro de fuego?",
+    "options": ["Elías", "Elishá", "Isaías", "Jeremías"],
+    "correctAnswer": 0,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 26,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué significa 'Emmanuel'?",
+    "options": ["Dios con nosotros", "Salvador", "Rey de reyes", "Cordero de Dios"],
+    "correctAnswer": 0,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 27,
+    "category": "Antiguo Testamento",
+    "question": "¿Quién fue el primer mártir de la Biblia?",
+    "options": ["Abel", "Esteban", "Urías", "Zacarías"],
+    "correctAnswer": 0,
+    "difficulty": "Difícil"
+  },
+  {
+    "id": 28,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué profesión tenía Lucas antes de ser discípulo?",
+    "options": ["Médico", "Recaudador", "Pescador", "Fariseo"],
+    "correctAnswer": 0,
+    "difficulty": "Difícil"
+  },
+  {
+    "id": 29,
+    "category": "Antiguo Testamento",
+    "question": "¿Quién fue la primera mujer mencionada en la Biblia?",
+    "options": ["Eva", "Sara", "Rebeca", "Lea"],
+    "correctAnswer": 0,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 30,
+    "category": "Nuevo Testamento",
+    "question": "¿En qué idioma estaba escrito el letrero de la cruz de Jesús?",
+    "options": ["Hebreo, griego y latín", "Arameo y griego", "Latín y hebreo", "Sólo griego"],
+    "correctAnswer": 0,
+    "difficulty": "Difícil"
+  },
+  {
+    "id": 31,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué profeta se casó con una prostituta como señal divina?",
+    "options": ["Oseas", "Amós", "Miqueas", "Jonás"],
+    "correctAnswer": 0,
+    "difficulty": "Difícil"
+  },
+  {
+    "id": 32,
+    "category": "Nuevo Testamento",
+    "question": "¿Quién restauró la vista a Pablo?",
+    "options": ["Pedro", "Ananías", "Bernabé", "Lucas"],
+    "correctAnswer": 1,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 33,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué rey tuvo 700 esposas y 300 concubinas?",
+    "options": ["David", "Salomón", "Acab", "Jeroboam"],
+    "correctAnswer": 1,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 34,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué apóstol era hermano de Pedro?",
+    "options": ["Andrés", "Juan", "Felipe", "Tomás"],
+    "correctAnswer": 0,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 35,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué personaje luchó con un ángel toda la noche?",
+    "options": ["Jacob", "Moisés", "Elías", "Josué"],
+    "correctAnswer": 0,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 36,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué discípulo era conocido como 'el amado'?",
+    "options": ["Pedro", "Juan", "Santiago", "Judas"],
+    "correctAnswer": 1,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 37,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué rey escribió el Eclesiastés?",
+    "options": ["David", "Salomón", "Ezequías", "Josías"],
+    "correctAnswer": 1,
+    "difficulty": "Medio"
+  },
+  {
+    "id": 38,
+    "category": "Nuevo Testamento",
+    "question": "¿Qué mujer resucitó Pedro?",
+    "options": ["Lidia", "Tabita", "Priscila", "Dorcas"],
+    "correctAnswer": 3,
+    "difficulty": "Difícil"
+  },
+  {
+    "id": 39,
+    "category": "Antiguo Testamento",
+    "question": "¿Qué profeta fue arrojado al foso de los leones?",
+    "options": ["Jeremías", "Daniel", "Ezequiel", "Isaías"],
+    "correctAnswer": 1,
+    "difficulty": "Fácil"
+  },
+  {
+    "id": 40,
+    "category": "Nuevo Testamento",
+    "question": "¿Cuántos libros tiene el Nuevo Testamento?",
+    "options": ["27", "29", "33", "39"],
+    "correctAnswer": 0,
+    "difficulty": "Medio"
+  }
+]
