@@ -17,15 +17,46 @@ interface Question {
   difficulty: string;
 }
 
+interface ShuffledQuestion extends Question {
+  shuffledOptions: string[];
+  newCorrectAnswer: number;
+}
+
 export default function QuizScreen() {
   const { settings, isLoading: settingsLoading } = useSettings();
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<ShuffledQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [timerKey, setTimerKey] = useState(0);
+
+  // Función para aleatorizar las opciones de una pregunta
+  const shuffleQuestionOptions = (question: Question): ShuffledQuestion => {
+    const originalCorrectAnswer = question.options[question.correctAnswer];
+    
+    // Crear un array de opciones con índices
+    const optionsWithIndices = question.options.map((option, index) => ({
+      option,
+      originalIndex: index,
+    }));
+    
+    // Aleatorizar las opciones
+    const shuffledOptionsWithIndices = [...optionsWithIndices].sort(() => 0.5 - Math.random());
+    
+    // Extraer solo las opciones aleatorizadas
+    const shuffledOptions = shuffledOptionsWithIndices.map(item => item.option);
+    
+    // Encontrar la nueva posición de la respuesta correcta
+    const newCorrectAnswer = shuffledOptions.findIndex(option => option === originalCorrectAnswer);
+    
+    return {
+      ...question,
+      shuffledOptions,
+      newCorrectAnswer,
+    };
+  };
 
   // Cargar preguntas al inicializar
   useEffect(() => {
@@ -46,7 +77,10 @@ export default function QuizScreen() {
     const shuffled = [...filteredQuestions].sort(() => 0.5 - Math.random());
     const selectedQuestions = shuffled.slice(0, settings.questionsPerSession);
     
-    setQuestions(selectedQuestions);
+    // Aleatorizar las opciones de cada pregunta
+    const questionsWithShuffledOptions = selectedQuestions.map(question => shuffleQuestionOptions(question));
+    
+    setQuestions(questionsWithShuffledOptions);
     setIsLoading(false);
   };
 
@@ -89,8 +123,8 @@ export default function QuizScreen() {
     setSelectedAnswer(answerIndex);
     setShowResult(true);
 
-    // Verificar si es correcta
-    if (answerIndex === currentQuestion.correctAnswer) {
+    // Verificar si es correcta usando el nuevo índice
+    if (answerIndex === currentQuestion.newCorrectAnswer) {
       setScore(score + 1);
     }
 
@@ -103,7 +137,7 @@ export default function QuizScreen() {
         setTimerKey(timerKey + 1); // Reiniciar timer para la nueva pregunta
       } else {
         // Quiz terminado
-        const finalScore = score + (answerIndex === currentQuestion.correctAnswer ? 1 : 0);
+        const finalScore = score + (answerIndex === currentQuestion.newCorrectAnswer ? 1 : 0);
         
         // Guardar estadísticas antes de mostrar el resultado
         await saveGameStats(finalScore, questions.length);
@@ -155,11 +189,12 @@ export default function QuizScreen() {
   const getButtonStyle = (index: number) => {
     if (!showResult) return styles.optionButton;
     
-    if (index === currentQuestion.correctAnswer) {
+    // Usar el nuevo índice de respuesta correcta
+    if (index === currentQuestion.newCorrectAnswer) {
       return [styles.optionButton, styles.correctAnswer];
     }
     
-    if (index === selectedAnswer && index !== currentQuestion.correctAnswer) {
+    if (index === selectedAnswer && index !== currentQuestion.newCorrectAnswer) {
       return [styles.optionButton, styles.wrongAnswer];
     }
     
@@ -207,9 +242,9 @@ export default function QuizScreen() {
         </ThemedText>
       </View>
 
-      {/* Opciones */}
+      {/* Opciones - AHORA USA LAS OPCIONES ALEATORIZADAS */}
       <View style={styles.optionsContainer}>
-        {currentQuestion.options.map((option, index) => (
+        {currentQuestion.shuffledOptions.map((option, index) => (
           <Pressable
             key={index}
             style={getButtonStyle(index)}
