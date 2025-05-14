@@ -21,24 +21,18 @@ interface SettingsModalProps {
 
 interface Settings {
   difficulty: string;
-  timePerQuestion: number;
-  questionsPerSession: number;
   backgroundMusic: boolean;
   soundEffects: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  difficulty: 'Mixto',
-  timePerQuestion: 15,
-  questionsPerSession: 10,
+  difficulty: 'Mixed',
   backgroundMusic: true,
   soundEffects: true,
 };
 
 export default function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [difficulty, setDifficulty] = useState(DEFAULT_SETTINGS.difficulty);
-  const [timePerQuestion, setTimePerQuestion] = useState(DEFAULT_SETTINGS.timePerQuestion);
-  const [questionsPerSession, setQuestionsPerSession] = useState(DEFAULT_SETTINGS.questionsPerSession);
   const [backgroundMusic, setBackgroundMusic] = useState(DEFAULT_SETTINGS.backgroundMusic);
   const [soundEffects, setSoundEffects] = useState(DEFAULT_SETTINGS.soundEffects);
 
@@ -56,80 +50,52 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
       if (savedSettings) {
         const settings: Settings = JSON.parse(savedSettings);
         setDifficulty(settings.difficulty);
-        setTimePerQuestion(settings.timePerQuestion);
-        setQuestionsPerSession(settings.questionsPerSession);
         setBackgroundMusic(settings.backgroundMusic);
         setSoundEffects(settings.soundEffects);
-        console.log('Configuraciones cargadas:', settings);
+        console.log('Settings loaded:', settings);
       }
     } catch (error) {
-      console.error('Error al cargar configuraciones:', error);
+      console.error('Error loading settings:', error);
     }
   };
 
+  // Función para guardar configuraciones en AsyncStorage
   const saveSettings = async (newSettings: Settings) => {
     try {
       await AsyncStorage.setItem('gameSettings', JSON.stringify(newSettings));
-      console.log('Configuraciones guardadas:', newSettings);
+      console.log('Settings saved:', newSettings);
     } catch (error) {
-      console.error('Error al guardar configuraciones:', error);
+      console.error('Error saving settings:', error);
     }
   };
 
+  // Función para actualizar dificultad
   const updateDifficulty = (value: string) => {
     setDifficulty(value);
     const newSettings: Settings = {
       difficulty: value,
-      timePerQuestion,
-      questionsPerSession,
       backgroundMusic,
       soundEffects,
     };
     saveSettings(newSettings);
   };
 
-  const updateTimePerQuestion = (value: number) => {
-    setTimePerQuestion(value);
-    const newSettings: Settings = {
-      difficulty,
-      timePerQuestion: value,
-      questionsPerSession,
-      backgroundMusic,
-      soundEffects,
-    };
-    saveSettings(newSettings);
-  };
-
-  const updateQuestionsPerSession = (value: number) => {
-    setQuestionsPerSession(value);
-    const newSettings: Settings = {
-      difficulty,
-      timePerQuestion,
-      questionsPerSession: value,
-      backgroundMusic,
-      soundEffects,
-    };
-    saveSettings(newSettings);
-  };
-
+  // Función para actualizar música de fondo
   const updateBackgroundMusic = (value: boolean) => {
     setBackgroundMusic(value);
     const newSettings: Settings = {
       difficulty,
-      timePerQuestion,
-      questionsPerSession,
       backgroundMusic: value,
       soundEffects,
     };
     saveSettings(newSettings);
   };
 
+  // Función para actualizar efectos de sonido
   const updateSoundEffects = (value: boolean) => {
     setSoundEffects(value);
     const newSettings: Settings = {
       difficulty,
-      timePerQuestion,
-      questionsPerSession,
       backgroundMusic,
       soundEffects: value,
     };
@@ -151,22 +117,23 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
           <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Configuración</Text>
+              <Text style={styles.title}>Settings</Text>
               <Pressable style={styles.closeButton} onPress={onClose}>
-                <Text style={styles.closeX}>Guardar</Text>
+                <Text style={styles.closeX}>×</Text>
               </Pressable>
             </View>
 
             <ScrollView style={styles.content}>
-              {/* Quiz Section */}
+              {/* Game Section */}
               <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Game</Text>
                 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Dificultad</Text>
+                  <Text style={styles.label}>Difficulty</Text>
                   <Text style={styles.value}>{difficulty}</Text>
                 </View>
                 <View style={styles.options}>
-                  {['Fácil', 'Medio', 'Difícil', 'Mixto'].map((option) => (
+                  {['Easy', 'Medium', 'Hard', 'Mixed'].map((option) => (
                     <Pressable
                       key={option}
                       style={[styles.option, difficulty === option && styles.optionSelected]}
@@ -178,50 +145,14 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
                     </Pressable>
                   ))}
                 </View>
-
-                <View style={styles.row}>
-                  <Text style={styles.label}>Tiempo por pregunta</Text>
-                  <Text style={styles.value}>{timePerQuestion}s</Text>
-                </View>
-                <View style={styles.options}>
-                  {[10, 15, 20, 30].map((time) => (
-                    <Pressable
-                      key={time}
-                      style={[styles.option, timePerQuestion === time && styles.optionSelected]}
-                      onPress={() => updateTimePerQuestion(time)}
-                    >
-                      <Text style={[styles.optionText, timePerQuestion === time && styles.optionTextSelected]}>
-                        {time}s
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <View style={styles.row}>
-                  <Text style={styles.label}>Preguntas por sesión</Text>
-                  <Text style={styles.value}>{questionsPerSession}</Text>
-                </View>
-                <View style={styles.options}>
-                  {[5, 10, 15, 20].map((count) => (
-                    <Pressable
-                      key={count}
-                      style={[styles.option, questionsPerSession === count && styles.optionSelected]}
-                      onPress={() => updateQuestionsPerSession(count)}
-                    >
-                      <Text style={[styles.optionText, questionsPerSession === count && styles.optionTextSelected]}>
-                        {count}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
               </View>
 
               {/* Audio Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Audio y Sonido</Text>
+                <Text style={styles.sectionTitle}>Audio & Sound</Text>
                 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Música de fondo</Text>
+                  <Text style={styles.label}>Background Music</Text>
                   <Switch
                     value={backgroundMusic}
                     onValueChange={updateBackgroundMusic}
@@ -231,7 +162,7 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
                 </View>
 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Efectos de sonido</Text>
+                  <Text style={styles.label}>Sound Effects</Text>
                   <Switch
                     value={soundEffects}
                     onValueChange={updateSoundEffects}
@@ -243,25 +174,25 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
 
               {/* Support Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Soporte</Text>
+                <Text style={styles.sectionTitle}>Support</Text>
                 <Pressable 
                   style={styles.supportButton}
                   onPress={() => {
-                    const email = 'soporte@bibliquiz.com';
-                    const subject = 'Reporte de problema - BibliQuiz';
-                    const body = 'Describe tu problema aquí...';
+                    const email = 'support@bibliquiz.com';
+                    const subject = 'Bug Report - BibliQuiz';
+                    const body = 'Describe your issue here...';
                     Linking.openURL(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
                   }}
                 >
-                  <Text style={styles.supportButtonText}>Informar problema</Text>
+                  <Text style={styles.supportButtonText}>Report Issue</Text>
                 </Pressable>
               </View>
 
               {/* About Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Acerca de</Text>
+                <Text style={styles.sectionTitle}>About</Text>
                 <View style={styles.row}>
-                  <Text style={styles.label}>Versión</Text>
+                  <Text style={styles.label}>Version</Text>
                   <Text style={styles.value}>1.0.0</Text>
                 </View>
               </View>
@@ -303,9 +234,9 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   closeButton: {
-    width: 100,
+    width: 32,
     height: 32,
-    borderRadius: 10,
+    borderRadius: 16,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',

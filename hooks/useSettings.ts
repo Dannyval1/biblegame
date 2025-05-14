@@ -1,19 +1,14 @@
-// hooks/useSettings.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
 export interface Settings {
   difficulty: string;
-  timePerQuestion: number;
-  questionsPerSession: number;
   backgroundMusic: boolean;
   soundEffects: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  difficulty: 'Mixto',
-  timePerQuestion: 15,
-  questionsPerSession: 10,
+  difficulty: 'Mixed',
   backgroundMusic: true,
   soundEffects: true,
 };
