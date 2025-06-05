@@ -1,4 +1,4 @@
-// components/SettingsModal.tsx
+import { useAudioManager } from '@/hooks/useAudioManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
@@ -21,20 +21,22 @@ interface SettingsModalProps {
 
 interface Settings {
   difficulty: string;
-  backgroundMusic: boolean;
   soundEffects: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   difficulty: 'Mixed',
-  backgroundMusic: true,
   soundEffects: true,
 };
 
 export default function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [difficulty, setDifficulty] = useState(DEFAULT_SETTINGS.difficulty);
-  const [backgroundMusic, setBackgroundMusic] = useState(DEFAULT_SETTINGS.backgroundMusic);
   const [soundEffects, setSoundEffects] = useState(DEFAULT_SETTINGS.soundEffects);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { 
+    updateSoundEffects: updateAudioManagerSfx 
+  } = useAudioManager();
 
   // Cargar configuraciones cuando se abre el modal
   useEffect(() => {
@@ -46,60 +48,79 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
   // Función para cargar configuraciones desde AsyncStorage
   const loadSettings = async () => {
     try {
+      setIsLoading(true);
       const savedSettings = await AsyncStorage.getItem('gameSettings');
+      
       if (savedSettings) {
         const settings: Settings = JSON.parse(savedSettings);
-        setDifficulty(settings.difficulty);
-        setBackgroundMusic(settings.backgroundMusic);
-        setSoundEffects(settings.soundEffects);
-        console.log('Settings loaded:', settings);
+        console.log('📱 Settings cargados desde AsyncStorage:', settings);
+        
+        setDifficulty(settings.difficulty || DEFAULT_SETTINGS.difficulty);
+        setSoundEffects(settings.soundEffects ?? DEFAULT_SETTINGS.soundEffects);
+      } else {
+        console.log('📱 No hay settings guardados, usando defaults');
+        // Si no hay settings guardados, guardar los defaults
+        await saveSettings(DEFAULT_SETTINGS);
+        setDifficulty(DEFAULT_SETTINGS.difficulty);
+        setSoundEffects(DEFAULT_SETTINGS.soundEffects);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error('❌ Error loading settings:', error);
+      // En caso de error, usar defaults
+      setDifficulty(DEFAULT_SETTINGS.difficulty);
+      setSoundEffects(DEFAULT_SETTINGS.soundEffects);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Función para guardar configuraciones en AsyncStorage
   const saveSettings = async (newSettings: Settings) => {
     try {
+      console.log('💾 Guardando settings:', newSettings);
       await AsyncStorage.setItem('gameSettings', JSON.stringify(newSettings));
-      console.log('Settings saved:', newSettings);
+      
+      // Verificar que se guardó correctamente
+      const saved = await AsyncStorage.getItem('gameSettings');
+      const parsedSaved = saved ? JSON.parse(saved) : null;
+      console.log('✅ Settings guardados y verificados:', parsedSaved);
+      
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('❌ Error saving settings:', error);
     }
   };
 
   // Función para actualizar dificultad
-  const updateDifficulty = (value: string) => {
+  const updateDifficulty = async (value: string) => {
+    console.log(`🎯 Actualizando dificultad a: ${value}`);
+    
     setDifficulty(value);
+    
     const newSettings: Settings = {
       difficulty: value,
-      backgroundMusic,
       soundEffects,
     };
-    saveSettings(newSettings);
-  };
-
-  // Función para actualizar música de fondo
-  const updateBackgroundMusic = (value: boolean) => {
-    setBackgroundMusic(value);
-    const newSettings: Settings = {
-      difficulty,
-      backgroundMusic: value,
-      soundEffects,
-    };
-    saveSettings(newSettings);
+    
+    await saveSettings(newSettings);
   };
 
   // Función para actualizar efectos de sonido
-  const updateSoundEffects = (value: boolean) => {
+  const updateSoundEffects = async (value: boolean) => {
+    console.log(`🔊 Usuario cambió efectos de sonido a: ${value}`);
+    
+    // Actualizar estado local inmediatamente
     setSoundEffects(value);
+    
+    // Actualizar AudioManager inmediatamente
+    updateAudioManagerSfx(value);
+    
+    // Guardar en AsyncStorage
     const newSettings: Settings = {
       difficulty,
-      backgroundMusic,
       soundEffects: value,
     };
-    saveSettings(newSettings);
+    
+    await saveSettings(newSettings);
   };
 
   if (!visible) return null;
@@ -123,80 +144,77 @@ export default function SettingsModal({ visible, onClose }: SettingsModalProps) 
               </Pressable>
             </View>
 
-            <ScrollView style={styles.content}>
-              {/* Game Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Game</Text>
-                
-                <View style={styles.row}>
-                  <Text style={styles.label}>Difficulty</Text>
-                  <Text style={styles.value}>{difficulty}</Text>
-                </View>
-                <View style={styles.options}>
-                  {['Easy', 'Medium', 'Hard', 'Mixed'].map((option) => (
-                    <Pressable
-                      key={option}
-                      style={[styles.option, difficulty === option && styles.optionSelected]}
-                      onPress={() => updateDifficulty(option)}
-                    >
-                      <Text style={[styles.optionText, difficulty === option && styles.optionTextSelected]}>
-                        {option}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+            {/* Mostrar loading mientras carga */}
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading settings...</Text>
               </View>
-
-              {/* Audio Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Audio & Sound</Text>
-                
-                <View style={styles.row}>
-                  <Text style={styles.label}>Background Music</Text>
-                  <Switch
-                    value={backgroundMusic}
-                    onValueChange={updateBackgroundMusic}
-                    trackColor={{ false: '#767577', true: '#2D4B8E' }}
-                    thumbColor={backgroundMusic ? '#fff' : '#f4f3f4'}
-                  />
+            ) : (
+              <ScrollView style={styles.content}>
+                {/* Game Section */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Game</Text>
+                  
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Difficulty</Text>
+                    <Text style={styles.value}>{difficulty}</Text>
+                  </View>
+                  <View style={styles.options}>
+                    {['Easy', 'Medium', 'Hard', 'Mixed'].map((option) => (
+                      <Pressable
+                        key={option}
+                        style={[styles.option, difficulty === option && styles.optionSelected]}
+                        onPress={() => updateDifficulty(option)}
+                      >
+                        <Text style={[styles.optionText, difficulty === option && styles.optionTextSelected]}>
+                          {option}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
 
-                <View style={styles.row}>
-                  <Text style={styles.label}>Sound Effects</Text>
-                  <Switch
-                    value={soundEffects}
-                    onValueChange={updateSoundEffects}
-                    trackColor={{ false: '#767577', true: '#2D4B8E' }}
-                    thumbColor={soundEffects ? '#fff' : '#f4f3f4'}
-                  />
+                {/* Audio Section */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Audio & Sound</Text>
+                  
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Sound Effects</Text>
+                    <Switch
+                      value={soundEffects}
+                      onValueChange={updateSoundEffects}
+                      trackColor={{ false: '#767577', true: '#2D4B8E' }}
+                      thumbColor={soundEffects ? '#fff' : '#f4f3f4'}
+                    />
+                  </View>
                 </View>
-              </View>
 
-              {/* Support Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Support</Text>
-                <Pressable 
-                  style={styles.supportButton}
-                  onPress={() => {
-                    const email = 'support@bibliquiz.com';
-                    const subject = 'Bug Report - BibliQuiz';
-                    const body = 'Describe your issue here...';
-                    Linking.openURL(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-                  }}
-                >
-                  <Text style={styles.supportButtonText}>Report Issue</Text>
-                </Pressable>
-              </View>
-
-              {/* About Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About</Text>
-                <View style={styles.row}>
-                  <Text style={styles.label}>Version</Text>
-                  <Text style={styles.value}>1.0.0</Text>
+                {/* Support Section */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Support</Text>
+                  <Pressable 
+                    style={styles.supportButton}
+                    onPress={() => {
+                      const email = 'support@bibliquiz.com';
+                      const subject = 'Bug Report - BibliQuiz';
+                      const body = 'Describe your issue here...';
+                      Linking.openURL(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+                    }}
+                  >
+                    <Text style={styles.supportButtonText}>Report Issue</Text>
+                  </Pressable>
                 </View>
-              </View>
-            </ScrollView>
+
+                {/* About Section */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>About</Text>
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Version</Text>
+                    <Text style={styles.value}>1.0.0</Text>
+                  </View>
+                </View>
+              </ScrollView>
+            )}
           </View>
         </SafeAreaView>
       </View>
@@ -249,6 +267,26 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  debugContainer: {
+    marginTop: 10,
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
   },
   section: {
     marginBottom: 30,

@@ -1,4 +1,3 @@
-// components/GameModeModal.tsx
 import React from 'react';
 import {
     Modal,
@@ -55,14 +54,14 @@ export default function GameModeModal({
                 </View>
                 <View style={styles.modeInfo}>
                   <Text style={styles.modeTitle}>Challenge Mode</Text>
-                  <Text style={styles.modeSubtitle}>3 lives • Get as far as you can</Text>
+                  <Text style={styles.modeSubtitle}>Complete levels • Earn rewards</Text>
                   <Text style={styles.modeDescription}>
-                    Answer correctly to advance. Lose all lives and it's game over!
+                    Progress through 5 themed levels. 3 lives per level.
                   </Text>
                   <View style={styles.modeFeatures}>
-                    <Text style={styles.featureText}>• Watch ads to continue</Text>
-                    <Text style={styles.featureText}>• 15 seconds per question</Text>
-                    <Text style={styles.featureText}>• Earn achievements</Text>
+                    <Text style={styles.featureText}>• 5 progressive levels</Text>
+                    <Text style={styles.featureText}>• 100% completion for gold</Text>
+                    <Text style={styles.featureText}>• Watch ads for extra life</Text>
                   </View>
                 </View>
               </Pressable>
@@ -77,14 +76,14 @@ export default function GameModeModal({
                 </View>
                 <View style={styles.modeInfo}>
                   <Text style={styles.modeTitle}>Time Attack</Text>
-                  <Text style={styles.modeSubtitle}>1 minute • Strategic answering</Text>
+                  <Text style={styles.modeSubtitle}>1 minute • Beat the clock</Text>
                   <Text style={styles.modeDescription}>
-                    Answer questions strategically - time penalties!
+                    Answer as many questions as possible in 60 seconds.
                   </Text>
                   <View style={styles.modeFeatures}>
-                    <Text style={styles.featureText}>• 1 minute timer</Text>
-                    <Text style={styles.featureText}>• -3s penalty after 30s</Text>
-                    <Text style={styles.featureText}>• +3s for 5 correct streak</Text>
+                    <Text style={styles.featureText}>• -3s penalty for wrong answer</Text>
+                    <Text style={styles.featureText}>• +3s bonus for 3-streak</Text>
+                    <Text style={styles.featureText}>• Speed & streak bonuses</Text>
                   </View>
                 </View>
               </Pressable>

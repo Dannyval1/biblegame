@@ -1,22 +1,23 @@
 // app/profile/index.tsx
+import { useAudioManager } from "@/hooks/useAudioManager";
 import {
-    CREEDS,
-    DENOMINATIONS,
-    GameStats,
-    UserProfile,
+  CREEDS,
+  DENOMINATIONS,
+  GameStats,
+  UserProfile,
 } from "@/types/Settings";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -39,7 +40,6 @@ const AVATAR_IMAGES = [
 ];
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [isLoading, setIsLoading] = useState(true);
   const [showUsernameEdit, setShowUsernameEdit] = useState(false);
@@ -49,6 +49,15 @@ export default function ProfileScreen() {
   const [tempEmail, setTempEmail] = useState('');
   const [tempCreed, setTempCreed] = useState('');
   const [tempDenomination, setTempDenomination] = useState('');
+
+  const { updateActiveScreen } = useAudioManager();
+
+  useFocusEffect(
+    useCallback(() => {
+      updateActiveScreen("profile");
+      return () => {};
+    }, [])
+  );
 
   useEffect(() => {
     loadProfile();
