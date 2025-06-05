@@ -1,13 +1,24 @@
-// app/(tabs)/index.tsx
-import GameModeModal, { GameMode } from '@/components/GameModeModal';
-import SettingsModal from '@/components/SettingsModal';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useAudioManager } from "@/hooks/useAudioManager";
+import { useFocusEffect } from "@react-navigation/native";
+
+import GameModeModal, { GameMode } from "@/components/GameModeModal";
+import SettingsModal from "@/components/SettingsModal";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import { router } from "expo-router";
+import React, { useCallback, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
 export default function HomeScreen() {
+  const { updateActiveScreen } = useAudioManager();
+
+  useFocusEffect(
+    useCallback(() => {
+      updateActiveScreen("home");
+      return () => {};
+    }, [])
+  );
+
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [gameModeVisible, setGameModeVisible] = useState(false);
 
@@ -16,35 +27,51 @@ export default function HomeScreen() {
   };
 
   const handleGameModeSelect = (mode: GameMode) => {
-    // Navigate to quiz with selected mode
-    router.push({
-      pathname: '/quiz',
-      params: { mode }
-    });
+    // Navigate to specific mode screen
+    switch (mode) {
+      case "challenge":
+        router.push("/quiz/challenge");
+        break;
+      case "timeAttack":
+        router.push("/quiz/time-attack");
+        break;
+      default:
+        console.log("Mode not implemented yet:", mode);
+    }
   };
 
   return (
     <ThemedView style={styles.container}>
       <View style={styles.content}>
-        <ThemedText type="title" style={styles.title}>Bible Trivia Game</ThemedText>
-        <ThemedText style={styles.subtitle}>Test your biblical knowledge!</ThemedText>
-        
+        <ThemedText type="title" style={styles.title}>
+          Bible Trivia Game
+        </ThemedText>
+        <ThemedText style={styles.subtitle}>
+          Test your biblical knowledge!
+        </ThemedText>
+
         <Pressable style={styles.button} onPress={handlePlayPress}>
           <ThemedText style={styles.buttonText}>Play</ThemedText>
         </Pressable>
-        
-        <Pressable style={styles.button} onPress={() => router.push('/')}>
+
+        <Pressable style={styles.button} onPress={() => router.push("/")}>
           <ThemedText style={styles.buttonText}>Ranking</ThemedText>
         </Pressable>
-        
-        <Pressable style={styles.button} onPress={() => router.push('/profile')}>
+
+        <Pressable
+          style={styles.button}
+          onPress={() => router.push("/profile")}
+        >
           <ThemedText style={styles.buttonText}>Profile</ThemedText>
         </Pressable>
-        
-        <Pressable style={styles.button} onPress={() => setSettingsVisible(true)}>
+
+        <Pressable
+          style={styles.button}
+          onPress={() => setSettingsVisible(true)}
+        >
           <ThemedText style={styles.buttonText}>Settings</ThemedText>
         </Pressable>
-        
+
         <View style={styles.statsContainer}>
           <ThemedText style={styles.statsText}>
             📖 Old & New Testament Questions
@@ -59,7 +86,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Settings Modal */}
-      <SettingsModal 
+      <SettingsModal
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
       />
@@ -80,43 +107,43 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 18,
     marginBottom: 40,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
   },
   button: {
-    backgroundColor: '#2D4B8E',
+    backgroundColor: "#2D4B8E",
     paddingVertical: 15,
     paddingHorizontal: 40,
     borderRadius: 25,
     marginBottom: 15,
-    width: 250
+    width: 250,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center'
+    fontWeight: "bold",
+    textAlign: "center",
   },
   statsContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 30,
   },
   statsText: {
     fontSize: 16,
     marginBottom: 8,
-    color: '#777',
+    color: "#777",
   },
 });
