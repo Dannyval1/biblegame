@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "876370782107",
+    "project_id": "biblical-challenge",
+    "storage_bucket": "biblical-challenge.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:876370782107:android:7af086fe90efd915b1e33e",
+        "android_client_info": {
+          "package_name": "com.danny.biblicalgame"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "876370782107-6acrt7lulkch4snt2emfhhbrpo82pqtl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeBjXbtsNG5XXdwvIkBsh95jBuXj0ixnc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "876370782107-6acrt7lulkch4snt2emfhhbrpo82pqtl.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "876370782107-rv3144bd95opdfn3ngn6o0pj03hcnrr6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.danny.biblicalgame"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

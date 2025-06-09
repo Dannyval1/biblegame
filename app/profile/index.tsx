@@ -1,10 +1,12 @@
 // app/profile/index.tsx
 import { useAudioManager } from "@/hooks/useAudioManager";
+import { useAuth } from "@/hooks/useAuth";
+import FirebaseService from "@/services/firebaseService";
+
 import {
   CREEDS,
   DENOMINATIONS,
   GameStats,
-  UserProfile,
 } from "@/types/Settings";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
@@ -20,149 +22,213 @@ import {
   View,
 } from "react-native";
 
-const DEFAULT_PROFILE: UserProfile = {
-  username: `User${Math.floor(Math.random() * 9999)}`,
-  email: '',
-  avatar: 0,
-  creed: '',
-  denomination: '',
-  gamesPlayed: 0,
-  averageScore: 0,
-  currentStreak: 0,
-  bestStreak: 0,
-  totalQuestions: 0,
-  correctAnswers: 0,
-  createdAt: new Date().toISOString(),
-};
-
 const AVATAR_IMAGES = [
   '👤', '👨', '👩', '🧔', '👱‍♂️', '👱‍♀️', '👨‍🦱', '👩‍🦱'
 ];
 
 export default function ProfileScreen() {
-  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
-  const [isLoading, setIsLoading] = useState(true);
+  // ✅ TODOS LOS HOOKS AL PRINCIPIO
+  const { user, loading, refreshUserProfile } = useAuth();
+  const { updateActiveScreen } = useAudioManager();
+  
   const [showUsernameEdit, setShowUsernameEdit] = useState(false);
   const [showEmailEdit, setShowEmailEdit] = useState(false);
   const [showReligiousInfo, setShowReligiousInfo] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [tempUsername, setTempUsername] = useState('');
   const [tempEmail, setTempEmail] = useState('');
+  const [tempPassword, setTempPassword] = useState('');
   const [tempCreed, setTempCreed] = useState('');
   const [tempDenomination, setTempDenomination] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [statsLoaded, setStatsLoaded] = useState(false); // ✅ Evitar cargar stats múltiples veces
 
-  const { updateActiveScreen } = useAudioManager();
-
+  // ✅ ARREGLAR useFocusEffect - agregar dependencias
   useFocusEffect(
     useCallback(() => {
       updateActiveScreen("profile");
       return () => {};
-    }, [])
+    }, [updateActiveScreen]) // ✅ Agregar dependencia
   );
 
+  // ✅ ARREGLAR useEffect - agregar condición para evitar ciclo infinito
   useEffect(() => {
-    loadProfile();
-    loadGameStats();
-  }, []);
-
-  const loadProfile = async () => {
-    try {
-      const savedProfile = await AsyncStorage.getItem('userProfile');
-      if (savedProfile) {
-        setProfile(JSON.parse(savedProfile));
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setIsLoading(false);
+    if (user && !statsLoaded && !loading) {
+      loadGameStats();
     }
-  };
+  }, [user, statsLoaded, loading]); // ✅ Dependencias específicas
 
   const loadGameStats = async () => {
+    if (!user || statsLoaded) return; // ✅ Prevenir múltiples cargas
+    
     try {
+      console.log('📊 Cargando estadísticas de juego...');
+      setStatsLoaded(true); // ✅ Marcar como cargado ANTES de la operación async
+      
       const savedStats = await AsyncStorage.getItem('gameStats');
       if (savedStats) {
         const stats: GameStats = JSON.parse(savedStats);
-        setProfile(prev => ({
-          ...prev,
+        
+        // Actualizar estadísticas en Firebase
+        await FirebaseService.updateGameStats({
           gamesPlayed: stats.gamesPlayed,
-          totalQuestions: stats.totalQuestions,
-          correctAnswers: stats.correctAnswers,
           averageScore: stats.totalQuestions > 0 ? 
             Math.round((stats.correctAnswers / stats.totalQuestions) * 100) : 0,
           currentStreak: stats.currentStreak,
           bestStreak: stats.bestStreak,
-        }));
+          totalQuestions: stats.totalQuestions,
+          correctAnswers: stats.correctAnswers,
+        });
+        
+        // ✅ Solo refrescar si realmente hay cambios
+        await refreshUserProfile();
+        console.log('✅ Estadísticas actualizadas');
       }
     } catch (error) {
-      console.error('Error loading game stats:', error);
-    }
-  };
-
-  const saveProfile = async (updatedProfile: UserProfile) => {
-    try {
-      await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
-      setProfile(updatedProfile);
-      Alert.alert('Success', 'Profile saved successfully!');
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      console.error('❌ Error loading game stats:', error);
+      setStatsLoaded(false); // ✅ Reset en caso de error
     }
   };
 
   const handleUsernameEdit = () => {
-    setTempUsername(profile.username);
+    if (!user) return;
+    setTempUsername(user.username);
     setShowUsernameEdit(true);
   };
 
-  const handleSaveUsername = () => {
-    if (tempUsername.trim()) {
-      const updatedProfile = { ...profile, username: tempUsername.trim() };
-      saveProfile(updatedProfile);
+  const handleSaveUsername = async () => {
+    if (!tempUsername.trim()) {
+      Alert.alert('Error', 'Username cannot be empty');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await FirebaseService.updateUsername(tempUsername.trim());
+      await refreshUserProfile();
       setShowUsernameEdit(false);
+      Alert.alert('Success', 'Username updated successfully!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update username');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleEmailEdit = () => {
-    setTempEmail(profile.email);
+    if (!user) return;
+    setTempEmail(user.email || '');
+    setTempPassword('');
+    setAuthMode(user.email ? 'login' : 'register');
     setShowEmailEdit(true);
   };
 
-  const handleSaveEmail = () => {
+  const handleSaveEmail = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!tempEmail || emailRegex.test(tempEmail)) {
-      const updatedProfile = { ...profile, email: tempEmail };
-      saveProfile(updatedProfile);
-      setShowEmailEdit(false);
-    } else {
+    
+    if (!tempEmail || !emailRegex.test(tempEmail)) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    if (!tempPassword) {
+      Alert.alert('Error', 'Password is required');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      if (authMode === 'register') {
+        await FirebaseService.registerWithEmail(tempEmail, tempPassword);
+        Alert.alert('Success', 'Account linked successfully!');
+      } else {
+        await FirebaseService.signInWithEmail(tempEmail, tempPassword);
+        Alert.alert('Success', 'Signed in successfully!');
+      }
+      
+      await refreshUserProfile();
+      setShowEmailEdit(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Authentication failed');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? You will continue with an anonymous account.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            setIsProcessing(true);
+            try {
+              await FirebaseService.signOut();
+              setStatsLoaded(false); // ✅ Reset stats cuando se cierra sesión
+              await refreshUserProfile();
+              Alert.alert('Success', 'Signed out successfully');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Sign out failed');
+            } finally {
+              setIsProcessing(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleReligiousInfoEdit = () => {
-    setTempCreed(profile.creed);
-    setTempDenomination(profile.denomination);
+    if (!user) return;
+    setTempCreed(user.creed);
+    setTempDenomination(user.denomination);
     setShowReligiousInfo(true);
   };
 
-  const handleSaveReligiousInfo = () => {
-    const updatedProfile = {
-      ...profile,
-      creed: tempCreed,
-      denomination: tempDenomination,
-    };
-    saveProfile(updatedProfile);
-    setShowReligiousInfo(false);
+  const handleSaveReligiousInfo = async () => {
+    setIsProcessing(true);
+    try {
+      await FirebaseService.updateReligiousInfo(tempCreed, tempDenomination);
+      await refreshUserProfile();
+      setShowReligiousInfo(false);
+      Alert.alert('Success', 'Religious information updated successfully!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update information');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleAvatarChange = (index: number) => {
-    const updatedProfile = { ...profile, avatar: index };
-    saveProfile(updatedProfile);
+  const handleAvatarChange = async (index: number) => {
+    setIsProcessing(true);
+    try {
+      await FirebaseService.updateAvatar(index);
+      await refreshUserProfile();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update avatar');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  if (isLoading) {
+  // ✅ RETURN CONDICIONAL AL FINAL
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Error loading profile</Text>
       </View>
     );
   }
@@ -177,16 +243,33 @@ export default function ProfileScreen() {
               key={index}
               style={[
                 styles.avatarOption,
-                profile.avatar === index && styles.selectedAvatar
+                user.avatar === index && styles.selectedAvatar,
+                isProcessing && styles.disabledOption
               ]}
-              onPress={() => handleAvatarChange(index)}
+              onPress={() => !isProcessing && handleAvatarChange(index)}
+              disabled={isProcessing}
             >
               <Text style={styles.avatarEmoji}>{emoji}</Text>
             </Pressable>
           ))}
         </View>
-        <Text style={styles.username}>{profile.username}</Text>
-        <Pressable style={styles.editButton} onPress={handleUsernameEdit}>
+        <Text style={styles.username}>{user.username}</Text>
+        <View style={styles.userStatusContainer}>
+          {user.isAnonymous && (
+            <Text style={styles.anonymousText}>📱 Anonymous User</Text>
+          )}
+          {user.linkedWithEmail && (
+            <Text style={styles.linkedText}>📧 Email Linked</Text>
+          )}
+          {user.linkedWithGoogle && (
+            <Text style={styles.linkedText}>🌐 Google Linked</Text>
+          )}
+        </View>
+        <Pressable 
+          style={[styles.editButton, isProcessing && styles.disabledButton]} 
+          onPress={handleUsernameEdit}
+          disabled={isProcessing}
+        >
           <Text style={styles.editButtonText}>✏️ Edit Name</Text>
         </Pressable>
       </View>
@@ -195,28 +278,64 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>📧 Account</Text>
         <Text style={styles.emailText}>
-          {profile.email || 'No email linked'}
+          {user.email || 'No email linked'}
         </Text>
-        <Pressable style={styles.linkButton} onPress={handleEmailEdit}>
-          <Text style={styles.linkButtonText}>
-            {profile.email ? '🔄 Change Email' : '🔗 Link Account'}
-          </Text>
-        </Pressable>
+        
+        {!user.linkedWithEmail && !user.linkedWithGoogle ? (
+          <View style={styles.buttonGroup}>
+            <Pressable 
+              style={[styles.linkButton, isProcessing && styles.disabledButton]} 
+              onPress={handleEmailEdit}
+              disabled={isProcessing}
+            >
+              <Text style={styles.linkButtonText}>
+                📧 Connect with Email
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.buttonGroup}>
+            {user.linkedWithEmail && (
+              <Pressable 
+                style={[styles.linkButton, isProcessing && styles.disabledButton]} 
+                onPress={handleEmailEdit}
+                disabled={isProcessing}
+              >
+                <Text style={styles.linkButtonText}>
+                  🔄 Change Email
+                </Text>
+              </Pressable>
+            )}
+            <Pressable 
+              style={[styles.signOutButton, isProcessing && styles.disabledButton]} 
+              onPress={handleSignOut}
+              disabled={isProcessing}
+            >
+              <Text style={styles.signOutButtonText}>
+                🚪 Sign Out
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       {/* Religious Information */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>⛪ Religious Information</Text>
-          <Pressable style={styles.editIconButton} onPress={handleReligiousInfoEdit}>
+          <Pressable 
+            style={[styles.editIconButton, isProcessing && styles.disabledButton]} 
+            onPress={handleReligiousInfoEdit}
+            disabled={isProcessing}
+          >
             <Text style={styles.editIcon}>✏️</Text>
           </Pressable>
         </View>
         <Text style={styles.infoText}>
-          Creed: {profile.creed || 'Not specified'}
+          Creed: {user.creed || 'Not specified'}
         </Text>
         <Text style={styles.infoText}>
-          Denomination: {profile.denomination || 'Not specified'}
+          Denomination: {user.denomination || 'Not specified'}
         </Text>
       </View>
 
@@ -225,48 +344,26 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>📊 My Progress</Text>
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile.gamesPlayed}</Text>
+            <Text style={styles.statNumber}>{user.gamesPlayed}</Text>
             <Text style={styles.statLabel}>Games</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile.averageScore}%</Text>
+            <Text style={styles.statNumber}>{user.averageScore}%</Text>
             <Text style={styles.statLabel}>Average</Text>
           </View>
         </View>
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile.currentStreak}</Text>
+            <Text style={styles.statNumber}>{user.currentStreak}</Text>
             <Text style={styles.statLabel}>Current Streak</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile.bestStreak}</Text>
+            <Text style={styles.statNumber}>{user.bestStreak}</Text>
             <Text style={styles.statLabel}>Best Streak</Text>
           </View>
         </View>
         <Pressable style={styles.detailsButton}>
           <Text style={styles.detailsButtonText}>📈 View Detailed Stats</Text>
-        </Pressable>
-      </View>
-
-      {/* Achievements Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🏆 Recent Achievements</Text>
-        <View style={styles.achievementsGrid}>
-          <View style={styles.achievement}>
-            <Text style={styles.achievementIcon}>🥇</Text>
-            <Text style={styles.achievementText}>First Game</Text>
-          </View>
-          <View style={styles.achievement}>
-            <Text style={styles.achievementIcon}>🥈</Text>
-            <Text style={styles.achievementText}>10 Games</Text>
-          </View>
-          <View style={styles.achievement}>
-            <Text style={styles.achievementIcon}>🥉</Text>
-            <Text style={styles.achievementText}>Good Streak</Text>
-          </View>
-        </View>
-        <Pressable style={styles.linkButton}>
-          <Text style={styles.linkButtonText}>View All Achievements</Text>
         </Pressable>
       </View>
 
@@ -281,32 +378,59 @@ export default function ProfileScreen() {
               onChangeText={setTempUsername}
               placeholder="Enter username"
               maxLength={20}
+              editable={!isProcessing}
             />
             <View style={styles.modalButtons}>
               <Pressable
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowUsernameEdit(false)}
+                disabled={isProcessing}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.modalButton, styles.saveButton]}
+                style={[styles.modalButton, styles.saveButton, isProcessing && styles.disabledButton]}
                 onPress={handleSaveUsername}
+                disabled={isProcessing}
               >
-                <Text style={styles.saveButtonText}>Save</Text>
+                <Text style={styles.saveButtonText}>
+                  {isProcessing ? 'Saving...' : 'Save'}
+                </Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Email Edit Modal */}
+      {/* Email/Auth Modal */}
       <Modal visible={showEmailEdit} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>
-              {profile.email ? 'Change Email' : 'Link Account'}
+              {user?.linkedWithEmail ? 'Sign In' : (authMode === 'register' ? 'Link Account' : 'Sign In')}
             </Text>
+            
+            {!user?.linkedWithEmail && (
+              <View style={styles.authModeToggle}>
+                <Pressable
+                  style={[styles.toggleButton, authMode === 'register' && styles.activeToggle]}
+                  onPress={() => setAuthMode('register')}
+                >
+                  <Text style={[styles.toggleText, authMode === 'register' && styles.activeToggleText]}>
+                    Link Account
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.toggleButton, authMode === 'login' && styles.activeToggle]}
+                  onPress={() => setAuthMode('login')}
+                >
+                  <Text style={[styles.toggleText, authMode === 'login' && styles.activeToggleText]}>
+                    Sign In
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+            
             <TextInput
               style={styles.textInput}
               value={tempEmail}
@@ -314,19 +438,32 @@ export default function ProfileScreen() {
               placeholder="Enter email address"
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!isProcessing}
+            />
+            <TextInput
+              style={styles.textInput}
+              value={tempPassword}
+              onChangeText={setTempPassword}
+              placeholder="Enter password"
+              secureTextEntry
+              editable={!isProcessing}
             />
             <View style={styles.modalButtons}>
               <Pressable
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowEmailEdit(false)}
+                disabled={isProcessing}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.modalButton, styles.saveButton]}
+                style={[styles.modalButton, styles.saveButton, isProcessing && styles.disabledButton]}
                 onPress={handleSaveEmail}
+                disabled={isProcessing}
               >
-                <Text style={styles.saveButtonText}>Save</Text>
+                <Text style={styles.saveButtonText}>
+                  {isProcessing ? 'Processing...' : (authMode === 'register' ? 'Link' : 'Sign In')}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -352,9 +489,11 @@ export default function ProfileScreen() {
                     key={creed}
                     style={[
                       styles.pickerOption,
-                      tempCreed === creed && styles.selectedOption
+                      tempCreed === creed && styles.selectedOption,
+                      isProcessing && styles.disabledOption
                     ]}
-                    onPress={() => setTempCreed(creed === 'Select...' ? '' : creed)}
+                    onPress={() => !isProcessing && setTempCreed(creed === 'Select...' ? '' : creed)}
+                    disabled={isProcessing}
                   >
                     <Text style={[
                       styles.pickerText,
@@ -373,9 +512,11 @@ export default function ProfileScreen() {
                     key={denomination}
                     style={[
                       styles.pickerOption,
-                      tempDenomination === denomination && styles.selectedOption
+                      tempDenomination === denomination && styles.selectedOption,
+                      isProcessing && styles.disabledOption
                     ]}
-                    onPress={() => setTempDenomination(denomination === 'Select...' ? '' : denomination)}
+                    onPress={() => !isProcessing && setTempDenomination(denomination === 'Select...' ? '' : denomination)}
+                    disabled={isProcessing}
                   >
                     <Text style={[
                       styles.pickerText,
@@ -392,19 +533,23 @@ export default function ProfileScreen() {
               <Pressable
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowReligiousInfo(false)}
+                disabled={isProcessing}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.modalButton, styles.saveButton]}
+                style={[styles.modalButton, styles.saveButton, isProcessing && styles.disabledButton]}
                 onPress={handleSaveReligiousInfo}
+                disabled={isProcessing}
               >
-                <Text style={styles.saveButtonText}>Save</Text>
+                <Text style={styles.saveButtonText}>
+                  {isProcessing ? 'Saving...' : 'Save'}
+                </Text>
               </Pressable>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
     </ScrollView>
   );
 }
@@ -451,6 +596,9 @@ const styles = StyleSheet.create({
     borderColor: '#2D4B8E',
     backgroundColor: '#e6f2ff',
   },
+  disabledOption: {
+    opacity: 0.5,
+  },
   avatarEmoji: {
     fontSize: 24,
   },
@@ -459,6 +607,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 10,
+  },
+  userStatusContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  anonymousText: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 4,
+  },
+  linkedText: {
+    fontSize: 14,
+    color: '#2D4B8E',
+    marginBottom: 4,
   },
   editButton: {
     backgroundColor: '#f0f0f0',
@@ -469,6 +631,9 @@ const styles = StyleSheet.create({
   editButtonText: {
     color: '#2D4B8E',
     fontSize: 16,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   section: {
     backgroundColor: '#fff',
@@ -506,6 +671,9 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 15,
   },
+  buttonGroup: {
+    gap: 10,
+  },
   linkButton: {
     backgroundColor: '#2D4B8E',
     paddingVertical: 12,
@@ -514,6 +682,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   linkButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  googleButton: {
+    backgroundColor: '#db4437',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  googleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  signOutButton: {
+    backgroundColor: '#ff6b6b',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  signOutButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -552,27 +744,6 @@ const styles = StyleSheet.create({
     color: '#2D4B8E',
     fontSize: 16,
   },
-  achievementsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 15,
-  },
-  achievement: {
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    width: '30%',
-  },
-  achievementIcon: {
-    fontSize: 30,
-    marginBottom: 5,
-  },
-  achievementText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -592,6 +763,30 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  authModeToggle: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    padding: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  activeToggle: {
+    backgroundColor: '#2D4B8E',
+  },
+  toggleText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  activeToggleText: {
+    color: '#fff',
   },
   textInput: {
     borderWidth: 1,

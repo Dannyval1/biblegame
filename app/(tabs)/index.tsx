@@ -1,26 +1,61 @@
 import { useAudioManager } from "@/hooks/useAudioManager";
 import { useFocusEffect } from "@react-navigation/native";
+import { Platform } from "react-native";
+
+import { auth } from "@/config/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 import GameModeModal, { GameMode } from "@/components/GameModeModal";
 import SettingsModal from "@/components/SettingsModal";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { useAuth } from "@/hooks/useAuth";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 export default function HomeScreen() {
+  console.log("🏠 HomeScreen cargando en:", Platform.OS);
+
+  // ✅ TODOS LOS HOOKS AL PRINCIPIO - MISMO ORDEN SIEMPRE
   const { updateActiveScreen } = useAudioManager();
+  const { initialized } = useAuth();
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [gameModeVisible, setGameModeVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       updateActiveScreen("home");
       return () => {};
-    }, [])
+    }, [updateActiveScreen])
   );
 
-  const [settingsVisible, setSettingsVisible] = useState(false);
-  const [gameModeVisible, setGameModeVisible] = useState(false);
+  useEffect(() => {
+    console.log("🏠 Inicializando Firebase desde Home...");
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log("✅ Usuario autenticado en Home:", user.uid);
+      } else {
+        console.log("❌ Sin usuario en Home");
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // ✅ RETURN CONDICIONAL AL FINAL, DESPUÉS DE TODOS LOS HOOKS
+  if (!initialized) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.content}>
+          <ThemedText type="title" style={styles.title}>
+            Loading Firebase...
+          </ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
 
   const handlePlayPress = () => {
     setGameModeVisible(true);
