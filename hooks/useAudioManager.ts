@@ -27,13 +27,10 @@ export const useAudioManager = () => {
   const updateActiveScreen = (
     screen: "home" | "profile" | "settings" | "game"
   ) => {
-    console.log(`🔄 Pantalla activa actualizada a: ${screen}`);
     setActiveScreen(screen);
 
     if (screen === "game") {
-      console.log("🎮 Pantalla game: Modo juego activado");
     } else {
-      console.log(`🏠 Pantalla ${screen}: Fuera del modo juego`);
       stopGameTimerSounds();
     }
   };
@@ -87,7 +84,6 @@ export const useAudioManager = () => {
 
   const loadSounds = async () => {
     try {
-      console.log("🎼 === CARGANDO SONIDOS ===");
 
       // Cargar efectos de sonido
       await loadSound(
@@ -114,7 +110,6 @@ export const useAudioManager = () => {
       );
 
       setAudioReady(true);
-      console.log("🎉 Sonidos cargados correctamente");
     } catch (error) {
       console.error("❌ Error cargando sonidos:", error);
     }
@@ -140,8 +135,6 @@ export const useAudioManager = () => {
   // ✅ FUNCIÓN MEJORADA PARA DETENER SONIDOS DE CRONÓMETRO
   const stopGameTimerSounds = async () => {
     if (isUnmounting.current) return;
-
-    console.log("🔇 Deteniendo cronómetro...");
 
     try {
       // Detener cronómetro normal con verificación de estado
@@ -178,8 +171,6 @@ export const useAudioManager = () => {
   // ✅ FUNCIÓN MEJORADA PARA CAMBIAR A TIMER FINAL
   const switchToFinalTimer = async () => {
     if (!soundEffectsEnabled) return;
-
-    console.log("⚠️ Cambiando a sonido final...");
 
     try {
       // Detener cronómetro normal con manejo seguro
@@ -218,8 +209,6 @@ export const useAudioManager = () => {
   // ✅ FUNCIÓN MEJORADA PARA INICIAR CRONÓMETRO
   const startGameTimerSound = async () => {
     if (!soundEffectsEnabled) return;
-
-    console.log("⏰ Iniciando cronómetro...");
 
     try {
       // Detener sonido final si está sonando
@@ -285,8 +274,6 @@ export const useAudioManager = () => {
 
   // ✅ FUNCIÓN MEJORADA PARA DESCARGAR SONIDOS
   const unloadAllSounds = async () => {
-    console.log("🔇 Descargando todos los sonidos...");
-
     const sounds = [
       { name: "correctAnswer", ref: correctAnswerSound },
       { name: "streak", ref: streakSound },
@@ -305,7 +292,6 @@ export const useAudioManager = () => {
             await ref.current.unloadAsync();
           }
           ref.current = null;
-          console.log(`✅ Sonido ${name} descargado`);
         } catch (error: any) {
           // Manejar error específico "Seeking interrupted"
           if (error.message.includes("Seeking interrupted")) {

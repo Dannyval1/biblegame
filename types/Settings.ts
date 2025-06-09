@@ -31,6 +31,7 @@ export interface Achievement {
 }
 
 export const CREEDS = [
+  "Select...",
   "Trinitario",
   "Unicitario",
   "Dualista",
@@ -52,3 +53,18 @@ export const DENOMINATIONS = [
   "Prefiero no decir",
   "Otro"
 ];
+
+export const DEFAULT_PROFILE = {
+  username: `User${Math.floor(Math.random() * 9999)}`,
+  email: '',
+  avatar: 0,
+  creed: '',
+  denomination: '',
+  gamesPlayed: 0,
+  averageScore: 0,
+  currentStreak: 0,
+  bestStreak: 0,
+  totalQuestions: 0,
+  correctAnswers: 0,
+  createdAt: new Date().toISOString(),
+};

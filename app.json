@@ -3,15 +3,18 @@
     "name": "biblegame",
     "slug": "biblegame",
     "version": "1.0.0",
+    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "biblegame",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.danny.biblicalgame",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.danny.biblicalgame",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
