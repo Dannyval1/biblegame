@@ -1,4 +1,5 @@
 // services/firebaseService.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   EmailAuthProvider,
   signOut as firebaseSignOut,
@@ -97,6 +98,9 @@ class FirebaseService {
       console.log(`🔧 Usuario anónimo creado en Auth: ${user.uid}`);
 
       const username = await this.generateUniqueUsername();
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 30);
+      
       const userProfile: FirebaseUserProfile = {
         uid: user.uid,
         username,
@@ -113,6 +117,11 @@ class FirebaseService {
         isAnonymous: true,
         linkedWithEmail: false,
         linkedWithGoogle: false,
+        // ✅ Campos opcionales con valores por defecto
+        lastActivity: new Date().toISOString(),
+        expiresAt: expirationDate.toISOString(),
+        activityScore: 0,
+        markedForDeletion: false
       };
 
       // Guardar en Firestore
@@ -262,13 +271,114 @@ class FirebaseService {
     }
   }
 
-  // Cerrar sesión
-  async signOut(): Promise<void> {
+  // ✅ NUEVO: Cerrar sesión y limpiar TODO (Opción B)
+  async signOutAndClearAll(): Promise<void> {
     try {
+      const currentUser = auth.currentUser;
+      
+      if (currentUser && currentUser.isAnonymous) {
+        console.log('🗑️ Marcando usuario anónimo para eliminación...');
+        // ✅ Marcar usuario anónimo para eliminación si no tiene actividad significativa
+        await this.markUserForDeletion(currentUser.uid);
+      }
+      
+      // Cerrar sesión en Firebase
       await firebaseSignOut(auth);
+      
+      // ✅ Limpiar TODO el AsyncStorage
+      await AsyncStorage.multiRemove([
+        'userProfile',
+        'anonymousUserUID', 
+        'gameStats',
+        'firstLaunch'
+      ]);
+      
+      console.log('✅ Sesión cerrada y todos los datos limpiados');
+      
     } catch (error) {
-      console.error('❌ Error signing out:', error);
+      console.error('❌ Error signing out and clearing data:', error);
       throw error;
+    }
+  }
+
+  // ✅ Marcar usuario para eliminación (soft delete)
+  private async markUserForDeletion(uid: string): Promise<void> {
+    try {
+      const userDoc = await getDoc(doc(firestore, 'users', uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as FirebaseUserProfile;
+        
+        // ✅ Solo marcar si no tiene actividad significativa
+        if (this.shouldMarkForDeletion(userData)) {
+          await updateDoc(doc(firestore, 'users', uid), {
+            markedForDeletion: true,
+            deletionMarkedAt: new Date().toISOString(),
+            lastActivity: new Date().toISOString()
+          });
+          
+          console.log(`🗑️ Usuario ${uid} marcado para eliminación`);
+        } else {
+          console.log(`📊 Usuario ${uid} tiene actividad significativa, manteniendo`);
+        }
+      }
+    } catch (error) {
+      // ✅ No fallar si no se puede marcar
+      if (__DEV__) {
+        console.log('⚠️ No se pudo marcar usuario para eliminación:', error);
+      }
+    }
+  }
+
+  // ✅ Criterios para decidir si eliminar (con verificaciones de campos opcionales)
+  private shouldMarkForDeletion(userData: FirebaseUserProfile): boolean {
+    const hasSignificantActivity = 
+      userData.gamesPlayed > 0 ||                           // Ha jugado
+      userData.creed !== '' ||                              // Ha configurado religión
+      userData.denomination !== '' ||                       // Ha configurado denominación
+      (userData.activityScore && userData.activityScore > 5) || // Actividad general (campo opcional)
+      !userData.username?.match(/^[A-Z][a-z]+[A-Z][a-z]+\d+$/); // Username personalizado
+    
+    return !hasSignificantActivity;
+  }
+
+  // ✅ Actualizar actividad del usuario (versión simplificada)
+  async updateUserActivity(activityType: 'game' | 'profile_edit' | 'login'): Promise<void> {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      // ✅ Obtener el valor actual primero
+      const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
+      if (!userDoc.exists()) return;
+
+      const currentData = userDoc.data() as FirebaseUserProfile;
+      const currentScore = currentData.activityScore || 0;
+
+      const scoreMap = {
+        'game': 10,
+        'profile_edit': 5,
+        'login': 1
+      };
+
+      const updates: any = {
+        lastActivity: new Date().toISOString(),
+        activityScore: currentScore + scoreMap[activityType] // ✅ Sumar manualmente
+      };
+
+      // ✅ Extender expiración si hay actividad significativa
+      if (activityType === 'game') {
+        const newExpiration = new Date();
+        newExpiration.setDate(newExpiration.getDate() + 30);
+        updates.expiresAt = newExpiration.toISOString();
+      }
+
+      await updateDoc(doc(firestore, 'users', currentUser.uid), updates);
+      
+    } catch (error) {
+      if (__DEV__) {
+        console.log('⚠️ No se pudo actualizar actividad:', error);
+      }
     }
   }
 
@@ -292,7 +402,7 @@ class FirebaseService {
     }
   }
 
-  // Actualizar estadísticas del juego
+  // ✅ Actualizar estadísticas del juego con tracking de actividad
   async updateGameStats(stats: {
     gamesPlayed: number;
     averageScore: number;
@@ -304,15 +414,23 @@ class FirebaseService {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        throw new Error('No user logged in');
+        // ✅ No mostrar error, solo avisar
+        console.log('⏳ No hay usuario autenticado, saltando actualización de stats');
+        return;
       }
 
       const userDocRef = doc(firestore, 'users', currentUser.uid);
       await updateDoc(userDocRef, stats);
+      console.log('📊 Estadísticas actualizadas en Firebase');
+
+      // ✅ Registrar actividad de juego
+      await this.updateUserActivity('game');
 
     } catch (error) {
-      console.error('❌ Error updating game stats:', error);
-      throw error;
+      // ✅ Log más amigable con type safety
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log('⚠️ No se pudieron actualizar las estadísticas:', errorMessage);
+      // ✅ No lanzar error para que la app continúe funcionando
     }
   }
 }

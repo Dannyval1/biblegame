@@ -52,4 +52,11 @@ export interface FirebaseUserProfile {
   isAnonymous: boolean;
   linkedWithEmail?: boolean;
   linkedWithGoogle?: boolean;
+  
+  // ✅ Campos opcionales para compatibilidad con usuarios existentes
+  lastActivity?: string;           // Última actividad
+  expiresAt?: string;             // Cuándo expira (solo anónimos)
+  markedForDeletion?: boolean;    // Marcado para eliminar
+  deletionMarkedAt?: string;      // Cuándo se marcó
+  activityScore?: number;         // Puntuación de actividad
 }
