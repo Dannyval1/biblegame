@@ -2,24 +2,21 @@ import { useAudioManager } from "@/hooks/useAudioManager";
 import { useFocusEffect } from "@react-navigation/native";
 import { Platform } from "react-native";
 
-import { auth } from "@/config/firebase";
-import { onAuthStateChanged } from "firebase/auth";
-
 import GameModeModal, { GameMode } from "@/components/GameModeModal";
 import SettingsModal from "@/components/SettingsModal";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/hooks/useAuth";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 export default function HomeScreen() {
   console.log("🏠 HomeScreen cargando en:", Platform.OS);
 
-  // ✅ TODOS LOS HOOKS AL PRINCIPIO - MISMO ORDEN SIEMPRE
+  // ✅ TODOS LOS HOOKS AL PRINCIPIO
   const { updateActiveScreen } = useAudioManager();
-  const { initialized } = useAuth();
+  const { initialized } = useAuth(); // ✅ Solo usa useAuth, elimina duplicaciones
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [gameModeVisible, setGameModeVisible] = useState(false);
 
@@ -30,21 +27,7 @@ export default function HomeScreen() {
     }, [updateActiveScreen])
   );
 
-  useEffect(() => {
-    console.log("🏠 Inicializando Firebase desde Home...");
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        console.log("✅ Usuario autenticado en Home:", user.uid);
-      } else {
-        console.log("❌ Sin usuario en Home");
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
-  // ✅ RETURN CONDICIONAL AL FINAL, DESPUÉS DE TODOS LOS HOOKS
+  // ✅ RETURN CONDICIONAL AL FINAL
   if (!initialized) {
     return (
       <ThemedView style={styles.container}>
@@ -89,7 +72,7 @@ export default function HomeScreen() {
           <ThemedText style={styles.buttonText}>Play</ThemedText>
         </Pressable>
 
-        <Pressable style={styles.button} onPress={() => router.push("/")}>
+        <Pressable style={styles.button} onPress={() => router.push("/ranking")}>
           <ThemedText style={styles.buttonText}>Ranking</ThemedText>
         </Pressable>
 

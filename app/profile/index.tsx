@@ -1,5 +1,5 @@
-// app/profile/index.tsx
-import { auth } from "@/config/firebase"; // ✅ Importar auth para verificación
+// app/profile/index.tsx - FIX: Error de tipos boolean
+import { auth } from "@/config/firebase";
 import { useAudioManager } from "@/hooks/useAudioManager";
 import { useAuth } from "@/hooks/useAuth";
 import FirebaseService from "@/services/firebaseService";
@@ -7,57 +7,133 @@ import FirebaseService from "@/services/firebaseService";
 import { CREEDS, DENOMINATIONS, GameStats } from "@/types/Settings";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  KeyboardEvent,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 
 const AVATAR_IMAGES = ["👤", "👨", "👩", "🧔", "👱‍♂️", "👱‍♀️", "👨‍🦱", "👩‍🦱"];
 
 export default function ProfileScreen() {
-  // ✅ TODOS LOS HOOKS AL PRINCIPIO
-  const { user, loading, refreshUserProfile } = useAuth();
+  const { user, loading, refreshUserProfile, clearUserData } = useAuth();
   const { updateActiveScreen } = useAudioManager();
 
   const [showUsernameEdit, setShowUsernameEdit] = useState(false);
   const [showEmailEdit, setShowEmailEdit] = useState(false);
   const [showReligiousInfo, setShowReligiousInfo] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [tempUsername, setTempUsername] = useState("");
   const [tempEmail, setTempEmail] = useState("");
   const [tempPassword, setTempPassword] = useState("");
   const [tempCreed, setTempCreed] = useState("");
   const [tempDenomination, setTempDenomination] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [statsLoaded, setStatsLoaded] = useState(false); // ✅ Evitar cargar stats múltiples veces
+  const [statsLoaded, setStatsLoaded] = useState(false);
+  const [isEmailValid, setIsEmailValid] = useState(false);
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [isSaveEnabled, setIsSaveEnabled] = useState(false);
 
-  // ✅ ARREGLAR useFocusEffect - agregar dependencias
+  const passwordInputRef = useRef<TextInput>(null);
+  
+  // ✅ NUEVO: Ref para tracking de último UID procesado
+  const lastProcessedUID = useRef<string>("");
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | number | null>(null);
+
+  // ✅ CORREGIDO: Validación con conversión explícita a boolean
+  useEffect(() => {
+    const creedSelected = Boolean(tempCreed && tempCreed !== "Select..." && tempCreed !== "");
+    const denominationSelected = Boolean(tempDenomination && tempDenomination !== "Select..." && tempDenomination !== "");
+    
+    // Requiere ambos campos seleccionados
+    setIsSaveEnabled(creedSelected && denominationSelected);
+  }, [tempCreed, tempDenomination]);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      (e: KeyboardEvent) => {
+        setKeyboardVisible(true);
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
+
+  // ✅ CORREGIDO: useEffect mejorado para detectar cambios de usuario
+  useEffect(() => {
+    if (user) {
+      console.log("👤 Usuario detectado en Profile:", user.username, "Anonymous:", user.isAnonymous);
+      
+      // ✅ NUEVO: Detectar si el usuario cambió (especialmente después de sign in)
+      const userChanged = lastProcessedUID.current !== user.uid;
+      
+      if (userChanged) {
+        console.log("🔄 Usuario cambió, limpiando estado local...");
+        lastProcessedUID.current = user.uid;
+        
+        // ✅ Limpiar estados relacionados con el usuario anterior
+        setStatsLoaded(false);
+        setTempEmail("");
+        setTempPassword("");
+        setIsEmailValid(false);
+        setIsPasswordValid(false);
+        setShowPassword(false);
+        
+        // ✅ Cerrar modales si estaban abiertos
+        setShowEmailEdit(false);
+        setShowUsernameEdit(false);
+        setShowReligiousInfo(false);
+        
+        console.log("✅ Estado local limpiado para nuevo usuario");
+      }
+      
+      // ✅ Si es usuario anónimo nuevo, preparar para carga de stats
+      if (user.isAnonymous && !statsLoaded && userChanged) {
+        console.log("🔄 Usuario anónimo nuevo detectado");
+      }
+    } else {
+      console.log("❌ No hay usuario en Profile");
+      lastProcessedUID.current = "";
+    }
+  }, [user?.uid, user?.isAnonymous, user?.linkedWithEmail, user?.username]);
+
   useFocusEffect(
     useCallback(() => {
       updateActiveScreen("profile");
       return () => {};
-    }, [updateActiveScreen]) // ✅ Agregar dependencia
+    }, [updateActiveScreen])
   );
 
-  // ✅ ARREGLAR useEffect - agregar condición para evitar ciclo infinito
   useEffect(() => {
-    // ✅ Solo cargar stats si el usuario está autenticado en Firebase Auth
     if (user && !statsLoaded && !loading && user.uid) {
-      // ✅ Verificar que Firebase Auth esté sincronizado
       const currentUser = auth.currentUser;
       if (currentUser && currentUser.uid === user.uid) {
         loadGameStats();
       } else {
         console.log("⏳ Esperando sincronización con Firebase Auth...");
-        // ✅ Intentar de nuevo en un momento
         setTimeout(() => {
           const retryUser = auth.currentUser;
           if (retryUser && retryUser.uid === user.uid) {
@@ -70,12 +146,11 @@ export default function ProfileScreen() {
         }, 1000);
       }
     }
-  }, [user, statsLoaded, loading]); // ✅ Dependencias específicas
+  }, [user, statsLoaded, loading]);
 
   const loadGameStats = async () => {
-    if (!user || statsLoaded) return; // ✅ Prevenir múltiples cargas
+    if (!user || statsLoaded) return;
 
-    // ✅ Verificar que Firebase Auth esté sincronizado antes de proceder
     const currentUser = auth.currentUser;
     if (!currentUser || currentUser.uid !== user.uid) {
       console.log(
@@ -86,13 +161,12 @@ export default function ProfileScreen() {
 
     try {
       console.log("📊 Cargando estadísticas de juego...");
-      setStatsLoaded(true); // ✅ Marcar como cargado ANTES de la operación async
+      setStatsLoaded(true);
 
       const savedStats = await AsyncStorage.getItem("gameStats");
       if (savedStats) {
         const stats: GameStats = JSON.parse(savedStats);
 
-        // ✅ Verificar de nuevo antes de la operación Firebase
         const authCheck = auth.currentUser;
         if (!authCheck || authCheck.uid !== user.uid) {
           console.log(
@@ -102,7 +176,6 @@ export default function ProfileScreen() {
           return;
         }
 
-        // Actualizar estadísticas en Firebase
         await FirebaseService.updateGameStats({
           gamesPlayed: stats.gamesPlayed,
           averageScore:
@@ -115,23 +188,35 @@ export default function ProfileScreen() {
           correctAnswers: stats.correctAnswers,
         });
 
-        // ✅ Solo refrescar si realmente hay cambios
         await refreshUserProfile();
         console.log("✅ Estadísticas actualizadas");
       } else {
         console.log("📝 No hay estadísticas guardadas localmente");
       }
-    } catch (error:any) {
+    } catch (error: any) {
       console.log(
         "⚠️ No se pudieron cargar las estadísticas:",
         error?.message || error
       );
-      setStatsLoaded(false); // ✅ Reset en caso de error
+      setStatsLoaded(false);
     }
   };
 
   const handleUsernameEdit = () => {
     if (!user) return;
+
+    if (user.isAnonymous) {
+      Alert.alert(
+        "Connect Email First",
+        "You need to connect your email before you can customize your username.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Connect Email", onPress: handleEmailEdit },
+        ]
+      );
+      return;
+    }
+
     setTempUsername(user.username);
     setShowUsernameEdit(true);
   };
@@ -142,6 +227,25 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (tempUsername.length < 3) {
+      Alert.alert("Error", "Username must be at least 3 characters long");
+      return;
+    }
+
+    if (tempUsername.length > 20) {
+      Alert.alert("Error", "Username cannot be longer than 20 characters");
+      return;
+    }
+
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(tempUsername)) {
+      Alert.alert(
+        "Error",
+        "Username can only contain letters, numbers, hyphens, and underscores"
+      );
+      return;
+    }
+
     setIsProcessing(true);
     try {
       await FirebaseService.updateUsername(tempUsername.trim());
@@ -149,51 +253,154 @@ export default function ProfileScreen() {
       setShowUsernameEdit(false);
       Alert.alert("Success", "Username updated successfully!");
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to update username");
+      if (error.message?.includes("already exists")) {
+        const suggestions = await generateUsernameSuggestions(
+          tempUsername.trim()
+        );
+        Alert.alert(
+          "Username Taken",
+          `"${tempUsername}" is already taken. Try one of these:\n\n${suggestions.join(
+            "\n"
+          )}`,
+          [
+            { text: "Try Again", style: "cancel" },
+            {
+              text: "Use First Suggestion",
+              onPress: () => {
+                setTempUsername(suggestions[0]);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Error", error.message || "Failed to update username");
+      }
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string) => {
+    return password.length >= 6;
+  };
+
+  const handleEmailChange = (email: string) => {
+    setTempEmail(email);
+    setIsEmailValid(validateEmail(email));
+  };
+
+  const handlePasswordChange = (password: string) => {
+    setTempPassword(password);
+    setIsPasswordValid(validatePassword(password));
+  };
+
+  const isContinueButtonEnabled =
+    isEmailValid && isPasswordValid && !isProcessing;
+
+  const generateUsernameSuggestions = async (
+    baseUsername: string
+  ): Promise<string[]> => {
+    const suggestions = [
+      `${baseUsername}_${Math.floor(Math.random() * 999) + 1}`,
+      `${baseUsername}${new Date().getFullYear()}`,
+      `${baseUsername}_believer`,
+      `faithful_${baseUsername}`,
+      `${baseUsername}_seeker`,
+    ];
+    return suggestions;
   };
 
   const handleEmailEdit = () => {
     if (!user) return;
     setTempEmail(user.email || "");
     setTempPassword("");
-    setAuthMode(user.email ? "login" : "register");
+    setIsEmailValid(false);
+    setIsPasswordValid(false);
+    setShowPassword(false);
     setShowEmailEdit(true);
   };
 
+  // ✅ CORREGIDO: handleSaveEmail con refresh mejorado para iOS
   const handleSaveEmail = async () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!tempEmail || !emailRegex.test(tempEmail)) {
+    if (!isEmailValid) {
       Alert.alert("Invalid Email", "Please enter a valid email address.");
       return;
     }
 
-    if (!tempPassword) {
-      Alert.alert("Error", "Password is required");
+    if (!isPasswordValid) {
+      Alert.alert(
+        "Invalid Password",
+        "Password must be at least 6 characters long."
+      );
       return;
     }
 
     setIsProcessing(true);
     try {
-      if (authMode === "register") {
-        await FirebaseService.registerWithEmail(tempEmail, tempPassword);
-        Alert.alert("Success", "Account linked successfully!");
+      const result = await FirebaseService.connectWithEmail(
+        tempEmail,
+        tempPassword
+      );
+
+      // ✅ NUEVO: Cerrar modal inmediatamente
+      setShowEmailEdit(false);
+      
+      // ✅ NUEVO: Mensaje de éxito apropiado
+      if (result.type === "linked") {
+        Alert.alert(
+          "Success",
+          "🎉 Your progress is now saved! You can access it from any device.",
+          [
+            {
+              text: "OK",
+            }
+          ]
+        );
       } else {
-        await FirebaseService.signInWithEmail(tempEmail, tempPassword);
-        Alert.alert("Success", "Signed in successfully!");
+        Alert.alert(
+          "Welcome Back",
+          "👋 Your account has been restored with all your saved progress!",
+          [
+            {
+              text: "OK", 
+            }
+          ]
+        );
       }
 
-      await refreshUserProfile();
-      setShowEmailEdit(false);
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Authentication failed");
+      if (
+        error.message?.includes("wrong-password") ||
+        error.message?.includes("user-not-found")
+      ) {
+        Alert.alert(
+          "Login Failed",
+          "Incorrect email or password. Please try again."
+        );
+      } else {
+        Alert.alert(
+          "Connection Failed",
+          error.message || "Unable to connect email. Please try again."
+        );
+      }
     } finally {
       setIsProcessing(false);
     }
   };
+
+  // ✅ Cleanup del timeout
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -207,15 +414,25 @@ export default function ProfileScreen() {
           onPress: async () => {
             setIsProcessing(true);
             try {
-              // ✅ Opción B: Limpiar TODO
+              // ✅ PASO 1: Limpiar estado local del componente
+              clearLocalState();
+              
+              // ✅ PASO 2: Cerrar sesión en Firebase y AsyncStorage
               await FirebaseService.signOutAndClearAll();
-              setStatsLoaded(false);
+              
+              // ✅ PASO 3: Limpiar estado del hook useAuth
+              if (clearUserData) {
+                await clearUserData();
+              }
+              
+              // ✅ PASO 4: Actualizar perfil para mostrar nuevo usuario anónimo
+              await new Promise(resolve => setTimeout(resolve, 300));
               await refreshUserProfile();
-              Alert.alert(
-                "Success",
-                "Signed out successfully. All local data cleared."
-              );
+              
+              Alert.alert("Success", "Signed out successfully. All local data cleared.");
+              
             } catch (error: any) {
+              console.error("❌ Error en sign out:", error);
               Alert.alert("Error", error.message || "Sign out failed");
             } finally {
               setIsProcessing(false);
@@ -228,12 +445,26 @@ export default function ProfileScreen() {
 
   const handleReligiousInfoEdit = () => {
     if (!user) return;
-    setTempCreed(user.creed);
-    setTempDenomination(user.denomination);
+    setTempCreed(user.creed || "");
+    setTempDenomination(user.denomination || "");
     setShowReligiousInfo(true);
   };
 
+  // ✅ NUEVO: Función para cancelar y reiniciar estado
+  const handleCancelReligiousInfo = () => {
+    // Reiniciar a los valores originales del usuario
+    setTempCreed(user?.creed || "");
+    setTempDenomination(user?.denomination || "");
+    setShowReligiousInfo(false);
+  };
+
+  // ✅ MODIFICADO: handleSaveReligiousInfo con validación mejorada
   const handleSaveReligiousInfo = async () => {
+    if (!isSaveEnabled) {
+      Alert.alert("Error", "Please select both Creed and Denomination");
+      return;
+    }
+
     setIsProcessing(true);
     try {
       await FirebaseService.updateReligiousInfo(tempCreed, tempDenomination);
@@ -259,7 +490,36 @@ export default function ProfileScreen() {
     }
   };
 
-  // ✅ RETURN CONDICIONAL AL FINAL
+  const clearLocalState = () => {
+    console.log("🧹 Limpiando estado local del componente...");
+
+    // Limpiar todos los estados de formularios
+    setTempUsername("");
+    setTempEmail("");
+    setTempPassword("");
+    setTempCreed("");
+    setTempDenomination("");
+
+    // Limpiar estados de validación
+    setIsEmailValid(false);
+    setIsPasswordValid(false);
+    setShowPassword(false);
+
+    // Limpiar estados de modales
+    setShowUsernameEdit(false);
+    setShowEmailEdit(false);
+    setShowReligiousInfo(false);
+
+    // Limpiar estados de carga
+    setStatsLoaded(false);
+    setIsProcessing(false);
+    
+    // ✅ NUEVO: Limpiar refs
+    lastProcessedUID.current = "";
+
+    console.log("✅ Estado local limpiado");
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -309,11 +569,16 @@ export default function ProfileScreen() {
           )}
         </View>
         <Pressable
-          style={[styles.editButton, isProcessing && styles.disabledButton]}
+          style={[
+            styles.editButton,
+            (isProcessing || user.isAnonymous) && styles.disabledButton,
+          ]}
           onPress={handleUsernameEdit}
-          disabled={isProcessing}
+          disabled={isProcessing || user.isAnonymous}
         >
-          <Text style={styles.editButtonText}>✏️ Edit Name</Text>
+          <Text style={styles.editButtonText}>
+            {user.isAnonymous ? "🔒 Connect Email to Edit" : "✏️ Edit Name"}
+          </Text>
         </Pressable>
       </View>
 
@@ -329,23 +594,13 @@ export default function ProfileScreen() {
               onPress={handleEmailEdit}
               disabled={isProcessing}
             >
-              <Text style={styles.linkButtonText}>📧 Connect with Email</Text>
+              <Text style={styles.linkButtonText}>
+                📧 Connect Email / Restore Account
+              </Text>
             </Pressable>
           </View>
         ) : (
           <View style={styles.buttonGroup}>
-            {user.linkedWithEmail && (
-              <Pressable
-                style={[
-                  styles.linkButton,
-                  isProcessing && styles.disabledButton,
-                ]}
-                onPress={handleEmailEdit}
-                disabled={isProcessing}
-              >
-                <Text style={styles.linkButtonText}>🔄 Change Email</Text>
-              </Pressable>
-            )}
             <Pressable
               style={[
                 styles.signOutButton,
@@ -416,6 +671,11 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Edit Username</Text>
+
+            <Text style={styles.subHelpText}>
+              3-20 characters • Letters, numbers, - and _ only
+            </Text>
+
             <TextInput
               style={styles.textInput}
               value={tempUsername}
@@ -423,6 +683,7 @@ export default function ProfileScreen() {
               placeholder="Enter username"
               maxLength={20}
               editable={!isProcessing}
+              autoCapitalize="none"
             />
             <View style={styles.modalButtons}>
               <Pressable
@@ -450,100 +711,121 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Email/Auth Modal */}
+      {/* Email Modal */}
       <Modal visible={showEmailEdit} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>
-              {user?.linkedWithEmail
-                ? "Sign In"
-                : authMode === "register"
-                ? "Link Account"
-                : "Sign In"}
-            </Text>
-
-            {!user?.linkedWithEmail && (
-              <View style={styles.authModeToggle}>
-                <Pressable
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? -250 : -250}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View
                   style={[
-                    styles.toggleButton,
-                    authMode === "register" && styles.activeToggle,
+                    styles.modal,
+                    keyboardVisible && styles.modalKeyboardOpen,
                   ]}
-                  onPress={() => setAuthMode("register")}
                 >
-                  <Text
+                  <Text style={styles.modalTitle}>
+                    Connect Email / Restore Account
+                  </Text>
+
+                  <Text style={styles.helpText}>
+                    💾 Save your progress and sync across devices.{"\n"}
+                    📧 Already have an account? Just enter your email to restore
+                    your data.
+                  </Text>
+
+                  <Text style={styles.subHelpText}>
+                    New users: Your current progress will be saved{"\n"}
+                    Existing users: Your saved data will be restored
+                  </Text>
+
+                  <TextInput
                     style={[
-                      styles.toggleText,
-                      authMode === "register" && styles.activeToggleText,
+                      styles.textInput,
+                      tempEmail &&
+                        (isEmailValid
+                          ? styles.validInput
+                          : styles.invalidInput),
+                    ]}
+                    value={tempEmail}
+                    onChangeText={handleEmailChange}
+                    placeholder="Enter email address"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!isProcessing}
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  />
+
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      ref={passwordInputRef}
+                      style={[
+                        styles.passwordInput,
+                        tempPassword &&
+                          (isPasswordValid
+                            ? styles.validInput
+                            : styles.invalidInput),
+                      ]}
+                      value={tempPassword}
+                      onChangeText={handlePasswordChange}
+                      placeholder="Enter password (min 6 characters)"
+                      secureTextEntry={!showPassword}
+                      editable={!isProcessing}
+                      returnKeyType="done"
+                      onSubmitEditing={handleSaveEmail}
+                    />
+                    <Pressable
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Text style={styles.eyeIcon}>
+                        {showPassword ? "🙈" : "👁️"}
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.modalButtons,
+                      keyboardVisible && styles.modalButtonsKeyboardOpen,
                     ]}
                   >
-                    Link Account
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.toggleButton,
-                    authMode === "login" && styles.activeToggle,
-                  ]}
-                  onPress={() => setAuthMode("login")}
-                >
-                  <Text
-                    style={[
-                      styles.toggleText,
-                      authMode === "login" && styles.activeToggleText,
-                    ]}
-                  >
-                    Sign In
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-
-            <TextInput
-              style={styles.textInput}
-              value={tempEmail}
-              onChangeText={setTempEmail}
-              placeholder="Enter email address"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!isProcessing}
-            />
-            <TextInput
-              style={styles.textInput}
-              value={tempPassword}
-              onChangeText={setTempPassword}
-              placeholder="Enter password"
-              secureTextEntry
-              editable={!isProcessing}
-            />
-            <View style={styles.modalButtons}>
-              <Pressable
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowEmailEdit(false)}
-                disabled={isProcessing}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.modalButton,
-                  styles.saveButton,
-                  isProcessing && styles.disabledButton,
-                ]}
-                onPress={handleSaveEmail}
-                disabled={isProcessing}
-              >
-                <Text style={styles.saveButtonText}>
-                  {isProcessing
-                    ? "Processing..."
-                    : authMode === "register"
-                    ? "Link"
-                    : "Sign In"}
-                </Text>
-              </Pressable>
+                    <Pressable
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={() => setShowEmailEdit(false)}
+                      disabled={isProcessing}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.modalButton,
+                        isContinueButtonEnabled
+                          ? styles.saveButton
+                          : styles.disabledSaveButton,
+                      ]}
+                      onPress={handleSaveEmail}
+                      disabled={!isContinueButtonEnabled}
+                    >
+                      <Text
+                        style={[
+                          styles.saveButtonText,
+                          !isContinueButtonEnabled && styles.disabledButtonText,
+                        ]}
+                      >
+                        {isProcessing ? "Connecting..." : "Continue"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Religious Info Modal */}
@@ -558,7 +840,9 @@ export default function ProfileScreen() {
               bounces={false}
               contentContainerStyle={{ paddingBottom: 20 }}
             >
-              <Text style={styles.label}>Creed:</Text>
+              <Text style={styles.label}>
+                Creed: <Text style={styles.required}>*</Text>
+              </Text>
               <View style={styles.pickerContainer}>
                 {CREEDS.map((creed) => (
                   <Pressable
@@ -586,7 +870,9 @@ export default function ProfileScreen() {
                 ))}
               </View>
 
-              <Text style={styles.label}>Denomination:</Text>
+              <Text style={styles.label}>
+                Denomination: <Text style={styles.required}>*</Text>
+              </Text>
               <View style={styles.pickerContainer}>
                 {DENOMINATIONS.map((denomination) => (
                   <Pressable
@@ -619,10 +905,11 @@ export default function ProfileScreen() {
               </View>
             </ScrollView>
 
+            {/* ✅ MODIFICADO: Botones con validación mejorada */}
             <View style={styles.modalButtons}>
               <Pressable
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowReligiousInfo(false)}
+                onPress={handleCancelReligiousInfo}
                 disabled={isProcessing}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -630,13 +917,18 @@ export default function ProfileScreen() {
               <Pressable
                 style={[
                   styles.modalButton,
-                  styles.saveButton,
+                  isSaveEnabled ? styles.saveButton : styles.disabledSaveButton,
                   isProcessing && styles.disabledButton,
                 ]}
                 onPress={handleSaveReligiousInfo}
-                disabled={isProcessing}
+                disabled={!isSaveEnabled || isProcessing}
               >
-                <Text style={styles.saveButtonText}>
+                <Text
+                  style={[
+                    styles.saveButtonText,
+                    (!isSaveEnabled || isProcessing) && styles.disabledButtonText,
+                  ]}
+                >
                   {isProcessing ? "Saving..." : "Save"}
                 </Text>
               </Pressable>
@@ -729,6 +1021,16 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.5,
   },
+  required: {
+    color: "#ff6b6b",
+    fontSize: 16,
+  },
+  disabledSaveButton: {
+    backgroundColor: "#ccc",
+  },
+  disabledButtonText: {
+    color: "#999",
+  },
   section: {
     backgroundColor: "#fff",
     margin: 15,
@@ -776,18 +1078,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   linkButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  googleButton: {
-    backgroundColor: "#db4437",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  googleButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
@@ -843,13 +1133,29 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: -60,
   },
   modal: {
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 25,
-    width: "90%",
-    maxHeight: "80%",
+    width: "100%",
+    maxWidth: 400,
+    maxHeight: "60%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalKeyboardOpen: {
+    paddingBottom: 10,
+    maxHeight: "65%",
+    marginTop: Platform.OS === "ios" ? -180 : -100,
   },
   modalTitle: {
     fontSize: 20,
@@ -858,29 +1164,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
-  authModeToggle: {
-    flexDirection: "row",
-    marginBottom: 20,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 10,
-    padding: 4,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 6,
-  },
-  activeToggle: {
-    backgroundColor: "#2D4B8E",
-  },
-  toggleText: {
+  helpText: {
     fontSize: 14,
     color: "#666",
-    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 15,
+    lineHeight: 20,
   },
-  activeToggleText: {
-    color: "#fff",
+  subHelpText: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 16,
+    fontStyle: "italic",
   },
   textInput: {
     borderWidth: 1,
@@ -889,6 +1186,37 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 16,
     marginBottom: 20,
+    minHeight: 50,
+  },
+  passwordContainer: {
+    position: "relative",
+    marginBottom: 20,
+  },
+  passwordInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 15,
+    paddingRight: 50,
+    fontSize: 16,
+    minHeight: 50,
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 15,
+    top: 10,
+    padding: 5,
+  },
+  eyeIcon: {
+    fontSize: 20,
+  },
+  validInput: {
+    borderColor: "#28a745",
+    backgroundColor: "#f8fff9",
+  },
+  invalidInput: {
+    borderColor: "#dc3545",
+    backgroundColor: "#fff8f8",
   },
   label: {
     fontSize: 16,
@@ -921,6 +1249,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 20,
+  },
+  modalButtonsKeyboardOpen: {
+    marginTop: 10,
+    marginBottom: 0,
   },
   modalButton: {
     flex: 1,
