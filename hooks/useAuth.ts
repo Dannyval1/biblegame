@@ -170,9 +170,20 @@ export const useAuth = () => {
       
       if (savedUID && savedProfile) {
         console.log(`🔄 Restaurando usuario desde almacenamiento: ${savedProfile.username}`);
+        
+        // ✅ Restaurar inmediatamente para UX, pero marcar que necesita sincronización
         setUser(savedProfile);
         setIsAuthenticated(true);
         console.log(`✅ Usuario restaurado: ${savedProfile.username}`);
+        
+        // ✅ Intentar reconectar con Firebase Auth en background
+        try {
+          // Firebase debería mantener la sesión automáticamente
+          // Si no funciona después de un tiempo, el onAuthStateChanged se encargará
+          console.log('🔄 Intentando sincronizar con Firebase Auth...');
+        } catch (error) {
+          console.log('⚠️ No se pudo sincronizar inmediatamente, continuando con datos locales');
+        }
       } else {
         // ✅ Primera vez o no hay datos - crear nuevo usuario anónimo
         console.log(`🆕 Primera instalación, creando usuario anónimo...`);
@@ -208,6 +219,9 @@ export const useAuth = () => {
   // ✅ Crear perfil para usuario autenticado existente
   const createUserProfile = async (authUser: User): Promise<FirebaseUserProfile> => {
     const username = await generateUniqueUsername();
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 30);
+    
     const userProfile: FirebaseUserProfile = {
       uid: authUser.uid,
       username,
@@ -224,6 +238,11 @@ export const useAuth = () => {
       isAnonymous: authUser.isAnonymous,
       linkedWithEmail: !!authUser.email,
       linkedWithGoogle: false,
+      // ✅ Campos opcionales con valores por defecto
+      lastActivity: new Date().toISOString(),
+      expiresAt: authUser.isAnonymous ? expirationDate.toISOString() : undefined,
+      activityScore: 0,
+      markedForDeletion: false
     };
 
     // Guardar en Firestore

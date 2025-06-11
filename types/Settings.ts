@@ -31,7 +31,6 @@ export interface Achievement {
 }
 
 export const CREEDS = [
-  "Select...",
   "Trinitario",
   "Unicitario",
   "Dualista",
@@ -40,16 +39,17 @@ export const CREEDS = [
 ];
 
 export const DENOMINATIONS = [
-  "No denominacional",
   "Católica",
   "Protestante",
+  "Movimiento Misionero Mundial",
   "Pentecostal Unida (IPUC)",
-  "Pentecostal Unida (IPUIC)",
+  "Pentecostés Unida (IPUIC)",
   "Testigos de Jehová",
   "Adventista",
   "Bautista",
   "Metodista",
   "Ortodoxa",
+  "No denominacional",
   "Prefiero no decir",
   "Otro"
 ];

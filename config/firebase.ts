@@ -1,10 +1,8 @@
-// config/firebase.ts
 import { getApps, initializeApp } from 'firebase/app';
-import { browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { Platform } from 'react-native';
 
-// Tu configuración de Firebase
+// Estos datos deben ir en un archivo de ENV, asumo yo porque son confidenciales
 const firebaseConfig = {
   apiKey: "AIzaSyCNw9MotF8C8ZCVz6bIEqGS7zIhFmffIXg",
   authDomain: "biblical-challenge.firebaseapp.com",
@@ -15,21 +13,16 @@ const firebaseConfig = {
   measurementId: "G-WW150BQB39"
 };
 
+if (getApps().length === 0) {
+  console.log('🔥 Inicializando Firebase por primera vez...');
+} else {
+  console.log('🔥 Firebase ya inicializado, usando instancia existente');
+}
+
 // Inicializar Firebase solo una vez
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Usar solo getAuth para evitar problemas con Expo SDK 53
 export const auth = getAuth(app);
-
-// ✅ Configurar persistencia si estamos en web
-if (Platform.OS === 'web') {
-  setPersistence(auth, browserLocalPersistence).catch((error) => {
-    if (__DEV__) {
-      console.error('Error setting persistence:', error);
-    }
-  });
-}
-
 export const firestore = getFirestore(app);
 
 // Debug info simple
@@ -52,4 +45,11 @@ export interface FirebaseUserProfile {
   isAnonymous: boolean;
   linkedWithEmail?: boolean;
   linkedWithGoogle?: boolean;
+  
+  // ✅ Campos opcionales para compatibilidad con usuarios existentes
+  lastActivity?: string;           // Última actividad
+  expiresAt?: string;             // Cuándo expira (solo anónimos)
+  markedForDeletion?: boolean;    // Marcado para eliminar
+  deletionMarkedAt?: string;      // Cuándo se marcó
+  activityScore?: number;         // Puntuación de actividad
 }
