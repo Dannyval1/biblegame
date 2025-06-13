@@ -1,8 +1,7 @@
-// hooks/useAuth.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { auth, FirebaseUserProfile, firestore } from "../config/firebase";
 import FirebaseService from "../services/firebaseService";
@@ -21,6 +20,11 @@ export const useAuth = () => {
   const [initialized, setInitialized] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
 
+  // 🔧 Referencias para controlar logs
+  const hasLoggedInit = useRef(false);
+  const lastLoggedUID = useRef('');
+  const lastLoggedUsername = useRef('');
+
   useEffect(() => {
     // Esperar a que Firebase esté listo
     const waitForFirebase = async () => {
@@ -35,14 +39,29 @@ export const useAuth = () => {
 
   useEffect(() => {
     if (!initialized) return;
-    console.log(`🔐 Inicializando Auth en ${Platform.OS}...`);
+    
+    // ✅ Log de inicialización solo una vez
+    if (__DEV__ && !hasLoggedInit.current) {
+      console.log(`🔐 Auth inicializado en ${Platform.OS}`);
+      hasLoggedInit.current = true;
+    }
     
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      console.log(`🔐 Auth state changed: ${authUser ? 'Usuario encontrado' : 'Sin usuario'}`);
+      // ✅ Solo loggear cambios importantes de estado
+      const userChanged = authUser?.uid !== lastLoggedUID.current;
+      
+      if (__DEV__ && userChanged) {
+        if (authUser) {
+          console.log(`🔐 Usuario autenticado: ${authUser.uid.substring(0, 8)}...`);
+        } else {
+          console.log(`🔐 Sin usuario autenticado`);
+        }
+        lastLoggedUID.current = authUser?.uid || '';
+      }
       
       // ✅ Evitar procesar si ya estamos creando un usuario
       if (isCreatingUser) {
-        console.log(`⏳ Ya creando usuario, saltando...`);
+        if (__DEV__) console.log(`⏳ Creando usuario, saltando auth state...`);
         return;
       }
       
@@ -50,20 +69,23 @@ export const useAuth = () => {
 
       try {
         if (authUser) {
-          console.log(`✅ Usuario autenticado: ${authUser.uid}, isAnonymous: ${authUser.isAnonymous}`);
-          
           // ✅ Intentar cargar perfil desde Firebase primero
           let userProfile = await loadUserProfileFromFirebase(authUser.uid);
           
           if (userProfile) {
-            console.log(`👤 Perfil cargado desde Firebase: ${userProfile.username}`);
+            // ✅ Solo loggear si el usuario cambió
+            if (__DEV__ && userProfile.username !== lastLoggedUsername.current) {
+              console.log(`👤 Perfil cargado: ${userProfile.username}`);
+              lastLoggedUsername.current = userProfile.username;
+            }
+            
             // ✅ Guardar en AsyncStorage para acceso rápido
             await saveUserProfileToStorage(userProfile);
             setUser(userProfile);
             setIsAuthenticated(true);
           } else if (authUser.isAnonymous) {
             // ✅ Usuario anónimo sin perfil - crear perfil en Firestore
-            console.log(`📝 Creando perfil en Firestore para usuario anónimo...`);
+            if (__DEV__) console.log(`📝 Creando perfil para usuario anónimo...`);
             setIsCreatingUser(true);
             try {
               const newProfile = await createUserProfile(authUser);
@@ -71,9 +93,9 @@ export const useAuth = () => {
               await AsyncStorage.setItem(STORAGE_KEYS.USER_UID, authUser.uid);
               setUser(newProfile);
               setIsAuthenticated(true);
-              console.log(`✅ Perfil anónimo creado: ${newProfile.username}`);
+              if (__DEV__) console.log(`✅ Perfil anónimo creado: ${newProfile.username}`);
             } catch (error) {
-              console.error("❌ Error creando perfil:", error);
+              if (__DEV__) console.error("❌ Error creando perfil:", error);
               setUser(null);
               setIsAuthenticated(false);
             } finally {
@@ -81,13 +103,13 @@ export const useAuth = () => {
             }
           } else {
             // Usuario con email pero sin perfil
-            console.log(`🆕 Creando perfil para usuario con email...`);
+            if (__DEV__) console.log(`🆕 Creando perfil para usuario con email...`);
             setIsCreatingUser(true);
             try {
               await createProfileForExistingUser(authUser);
-              console.log(`✅ Perfil con email creado`);
+              if (__DEV__) console.log(`✅ Perfil con email creado`);
             } catch (error) {
-              console.error("❌ Error creando perfil con email:", error);
+              if (__DEV__) console.error("❌ Error creando perfil con email:", error);
               setUser(null);
               setIsAuthenticated(false);
             } finally {
@@ -95,12 +117,11 @@ export const useAuth = () => {
             }
           }
         } else {
-          // ✅ No hay usuario autenticado - verificar si tenemos uno guardado localmente
-          console.log(`🔍 Sin usuario autenticado, verificando almacenamiento local...`);
+          // ✅ No hay usuario autenticado - verificar almacenamiento local
           await handleNoAuthenticatedUser();
         }
       } catch (error) {
-        console.error("❌ Error inesperado en auth state change:", error);
+        if (__DEV__) console.error("❌ Error en auth state change:", error);
         setUser(null);
         setIsAuthenticated(false);
       } finally {
@@ -123,7 +144,7 @@ export const useAuth = () => {
       return null;
     } catch (error) {
       if (__DEV__) {
-        console.error('Error loading user profile from Firebase:', error);
+        console.error('❌ Error loading user profile from Firebase:', error);
       }
       return null;
     }
@@ -135,7 +156,7 @@ export const useAuth = () => {
       await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
     } catch (error) {
       if (__DEV__) {
-        console.error('Error saving profile to storage:', error);
+        console.error('❌ Error saving profile to storage:', error);
       }
     }
   };
@@ -150,7 +171,7 @@ export const useAuth = () => {
       return null;
     } catch (error) {
       if (__DEV__) {
-        console.error('Error loading profile from storage:', error);
+        console.error('❌ Error loading profile from storage:', error);
       }
       return null;
     }
@@ -159,7 +180,6 @@ export const useAuth = () => {
   // ✅ Manejar caso sin usuario autenticado
   const handleNoAuthenticatedUser = async () => {
     if (isCreatingUser) {
-      console.log(`⏳ Ya creando usuario, saltando handleNoAuthenticatedUser...`);
       return;
     }
 
@@ -169,34 +189,35 @@ export const useAuth = () => {
       const savedProfile = await loadUserProfileFromStorage();
       
       if (savedUID && savedProfile) {
-        console.log(`🔄 Restaurando usuario desde almacenamiento: ${savedProfile.username}`);
+        // ✅ Solo loggear si es diferente al último usuario
+        if (__DEV__ && savedProfile.username !== lastLoggedUsername.current) {
+          console.log(`🔄 Restaurando usuario: ${savedProfile.username}`);
+          lastLoggedUsername.current = savedProfile.username;
+        }
         
-        // ✅ Restaurar inmediatamente para UX, pero marcar que necesita sincronización
+        // ✅ Restaurar inmediatamente para UX
         setUser(savedProfile);
         setIsAuthenticated(true);
-        console.log(`✅ Usuario restaurado: ${savedProfile.username}`);
         
-        // ✅ Intentar reconectar con Firebase Auth en background
+        // ✅ Intentar reconectar con Firebase Auth en background (sin logs)
         try {
           // Firebase debería mantener la sesión automáticamente
-          // Si no funciona después de un tiempo, el onAuthStateChanged se encargará
-          console.log('🔄 Intentando sincronizar con Firebase Auth...');
         } catch (error) {
-          console.log('⚠️ No se pudo sincronizar inmediatamente, continuando con datos locales');
+          // Silencioso - no necesitamos loggear esto
         }
       } else {
-        // ✅ Primera vez o no hay datos - crear nuevo usuario anónimo
-        console.log(`🆕 Primera instalación, creando usuario anónimo...`);
-        setIsCreatingUser(true); // ✅ Proteger antes de llamar a Firebase
+        // ✅ Primera vez - crear nuevo usuario anónimo
+        if (__DEV__) console.log(`🆕 Creando nuevo usuario anónimo...`);
+        setIsCreatingUser(true);
         try {
           const newProfile = await FirebaseService.createAnonymousUser();
           await saveUserProfileToStorage(newProfile);
           await AsyncStorage.setItem(STORAGE_KEYS.USER_UID, newProfile.uid);
           setUser(newProfile);
           setIsAuthenticated(true);
-          console.log(`✅ Nuevo usuario anónimo creado: ${newProfile.username}`);
+          if (__DEV__) console.log(`✅ Usuario anónimo creado: ${newProfile.username}`);
         } catch (error) {
-          console.error("❌ Error creando nuevo usuario anónimo:", error);
+          if (__DEV__) console.error("❌ Error creando usuario anónimo:", error);
           setUser(null);
           setIsAuthenticated(false);
         } finally {
@@ -204,17 +225,12 @@ export const useAuth = () => {
         }
       }
     } catch (error) {
-      console.error('❌ Error manejando usuario no autenticado:', error);
+      if (__DEV__) console.error('❌ Error manejando usuario no autenticado:', error);
       setUser(null);
       setIsAuthenticated(false);
       setIsCreatingUser(false);
     }
   };
-
-  // ✅ Esta función ya no es necesaria - movimos la lógica a handleNoAuthenticatedUser
-  // const createNewAnonymousUser = async () => {
-  //   // Código movido a handleNoAuthenticatedUser
-  // };
 
   // ✅ Crear perfil para usuario autenticado existente
   const createUserProfile = async (authUser: User): Promise<FirebaseUserProfile> => {
@@ -258,7 +274,7 @@ export const useAuth = () => {
       setUser(userProfile);
       setIsAuthenticated(true);
     } catch (error) {
-      console.error("❌ Error creating profile for existing user:", error);
+      if (__DEV__) console.error("❌ Error creating profile for existing user:", error);
       throw error;
     }
   };
@@ -283,7 +299,10 @@ export const useAuth = () => {
         if (userProfile) {
           await saveUserProfileToStorage(userProfile);
           setUser(userProfile);
-          console.log(`🔄 Perfil actualizado: ${userProfile.username}`);
+          // ✅ Solo loggear si realmente cambió
+          if (__DEV__ && userProfile.username !== user.username) {
+            console.log(`🔄 Perfil actualizado: ${userProfile.username}`);
+          }
         }
       }
     } catch (error) {
@@ -305,9 +324,12 @@ export const useAuth = () => {
       ]);
       setUser(null);
       setIsAuthenticated(false);
-      console.log('🗑️ Datos de usuario limpiados');
+      // ✅ Resetear refs de logging
+      lastLoggedUID.current = '';
+      lastLoggedUsername.current = '';
+      if (__DEV__) console.log('🗑️ Datos de usuario limpiados');
     } catch (error) {
-      console.error('❌ Error limpiando datos:', error);
+      if (__DEV__) console.error('❌ Error limpiando datos:', error);
     }
   };
 

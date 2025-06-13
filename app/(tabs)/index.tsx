@@ -8,17 +8,36 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/hooks/useAuth";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 export default function HomeScreen() {
-  console.log("🏠 HomeScreen cargando en:", Platform.OS);
+  // 🔧 Ref para controlar el log (solo una vez)
+  const hasLoggedMount = useRef(false);
 
   // ✅ TODOS LOS HOOKS AL PRINCIPIO
   const { updateActiveScreen } = useAudioManager();
-  const { initialized } = useAuth(); // ✅ Solo usa useAuth, elimina duplicaciones
+  const { user } = useAuth(); // ✅ Obtener user para mostrar bienvenida
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [gameModeVisible, setGameModeVisible] = useState(false);
+
+  // 🔧 Log optimizado - solo al montar el componente
+  React.useEffect(() => {
+    if (__DEV__ && !hasLoggedMount.current) {
+      console.log(`🏠 HomeScreen montado en ${Platform.OS}`);
+      if (user) {
+        console.log(`👋 Bienvenido de vuelta, ${user.username}!`);
+      }
+      hasLoggedMount.current = true;
+    }
+  }, []); // Sin dependencias = solo se ejecuta al montar
+
+  // 🔧 Log cuando el usuario cambia (solo si es relevante)
+  React.useEffect(() => {
+    if (__DEV__ && user && hasLoggedMount.current) {
+      console.log(`👤 Usuario cargado en Home: ${user.username}`);
+    }
+  }, [user?.username]); // Solo cuando cambia el username
 
   useFocusEffect(
     useCallback(() => {
@@ -26,19 +45,6 @@ export default function HomeScreen() {
       return () => {};
     }, [updateActiveScreen])
   );
-
-  // ✅ RETURN CONDICIONAL AL FINAL
-  if (!initialized) {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={styles.content}>
-          <ThemedText type="title" style={styles.title}>
-            Loading Firebase...
-          </ThemedText>
-        </View>
-      </ThemedView>
-    );
-  }
 
   const handlePlayPress = () => {
     setGameModeVisible(true);
@@ -64,6 +70,14 @@ export default function HomeScreen() {
         <ThemedText type="title" style={styles.title}>
           Bible Trivia Game
         </ThemedText>
+        
+        {/* 👤 Mostrar bienvenida personalizada si hay usuario */}
+        {user && (
+          <ThemedText style={styles.welcomeText}>
+            Welcome back, {user.username}! 👋
+          </ThemedText>
+        )}
+        
         <ThemedText style={styles.subtitle}>
           Test your biblical knowledge!
         </ThemedText>
@@ -134,6 +148,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
     textAlign: "center",
+  },
+  welcomeText: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: "#2D4B8E",
+    textAlign: "center",
+    fontWeight: "500",
   },
   subtitle: {
     fontSize: 18,
