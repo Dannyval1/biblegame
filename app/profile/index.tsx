@@ -1,4 +1,3 @@
-// app/profile/index.tsx - FIX: Error de tipos boolean
 import { auth } from "@/config/firebase";
 import { useAudioManager } from "@/hooks/useAudioManager";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,11 +47,11 @@ export default function ProfileScreen() {
 
   const passwordInputRef = useRef<TextInput>(null);
   
-  // ✅ NUEVO: Ref para tracking de último UID procesado
+  // 🔧 Referencias para controlar logs
   const lastProcessedUID = useRef<string>("");
   const refreshTimeoutRef = useRef<NodeJS.Timeout | number | null>(null);
 
-  // ✅ CORREGIDO: Validación con conversión explícita a boolean
+  // ✅ Validación con conversión explícita a boolean
   useEffect(() => {
     const creedSelected = Boolean(tempCreed && tempCreed !== "Select..." && tempCreed !== "");
     const denominationSelected = Boolean(tempDenomination && tempDenomination !== "Select..." && tempDenomination !== "");

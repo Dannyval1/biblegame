@@ -11,6 +11,7 @@ import {
 } from "firebase/auth";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -26,7 +27,7 @@ class FirebaseService {
   private static instance: FirebaseService;
   private isCreatingAnonymousUser = false;
   private authStateReady = false;
-  
+
   // ✅ NUEVO: Variables para iOS específicamente
   private lastAuthState: User | null = null;
   private profileUpdateQueue: Array<() => Promise<void>> = [];
@@ -54,7 +55,7 @@ class FirebaseService {
       });
 
       // ✅ Timeout más largo para iOS
-      const timeout = Platform.OS === 'ios' ? 8000 : 5000;
+      const timeout = Platform.OS === "ios" ? 8000 : 5000;
       setTimeout(() => {
         unsubscribe();
         resolve(auth.currentUser);
@@ -69,15 +70,15 @@ class FirebaseService {
     }
 
     this.processingQueue = true;
-    
+
     try {
       while (this.profileUpdateQueue.length > 0) {
         const update = this.profileUpdateQueue.shift();
         if (update) {
           await update();
           // ✅ Pequeño delay entre actualizaciones en iOS
-          if (Platform.OS === 'ios') {
-            await new Promise(resolve => setTimeout(resolve, 100));
+          if (Platform.OS === "ios") {
+            await new Promise((resolve) => setTimeout(resolve, 100));
           }
         }
       }
@@ -241,7 +242,11 @@ class FirebaseService {
   }
 
   // ✅ NUEVO: Guardar perfil con retry para iOS
-  private async saveProfileWithRetry(uid: string, profile: FirebaseUserProfile, maxRetries: number = 3): Promise<void> {
+  private async saveProfileWithRetry(
+    uid: string,
+    profile: FirebaseUserProfile,
+    maxRetries: number = 3
+  ): Promise<void> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         await setDoc(doc(firestore, "users", uid), profile);
@@ -249,14 +254,14 @@ class FirebaseService {
         return;
       } catch (error) {
         console.log(`❌ Error en intento ${attempt}:`, error);
-        
+
         if (attempt === maxRetries) {
           throw error;
         }
-        
+
         // ✅ Wait más tiempo en iOS
-        const delay = Platform.OS === 'ios' ? attempt * 500 : attempt * 200;
-        await new Promise(resolve => setTimeout(resolve, delay));
+        const delay = Platform.OS === "ios" ? attempt * 500 : attempt * 200;
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
@@ -271,18 +276,22 @@ class FirebaseService {
       }
 
       console.log(`🔍 Obteniendo perfil para UID: ${currentUser.uid}`);
-      
+
       const userDocRef = doc(firestore, "users", currentUser.uid);
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
-        console.log(`❌ No existe documento en Firestore para UID: ${currentUser.uid}`);
+        console.log(
+          `❌ No existe documento en Firestore para UID: ${currentUser.uid}`
+        );
         return null;
       }
 
       const profileData = userDoc.data() as FirebaseUserProfile;
-      console.log(`✅ Perfil obtenido: ${profileData.username}, isAnonymous: ${profileData.isAnonymous}`);
-      
+      console.log(
+        `✅ Perfil obtenido: ${profileData.username}, isAnonymous: ${profileData.isAnonymous}`
+      );
+
       return profileData;
     } catch (error) {
       if (__DEV__) {
@@ -438,10 +447,10 @@ class FirebaseService {
             });
           };
 
-          if (Platform.OS === 'ios') {
+          if (Platform.OS === "ios") {
             this.queueProfileUpdate(updateProfile);
             // ✅ Delay adicional para iOS
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
           } else {
             await updateProfile();
           }
@@ -457,12 +466,12 @@ class FirebaseService {
             try {
               await signInWithEmailAndPassword(auth, email, password);
               console.log("✅ Sign in exitoso con cuenta existente");
-              
+
               // ✅ NUEVO: Pequeño delay para iOS antes de retornar
-              if (Platform.OS === 'ios') {
-                await new Promise(resolve => setTimeout(resolve, 300));
+              if (Platform.OS === "ios") {
+                await new Promise((resolve) => setTimeout(resolve, 300));
               }
-              
+
               return {
                 type: "signin",
                 message: "Signed in with existing account",
@@ -490,12 +499,12 @@ class FirebaseService {
         try {
           await signInWithEmailAndPassword(auth, email, password);
           console.log("✅ Sign in directo exitoso");
-          
+
           // ✅ NUEVO: Delay para iOS
-          if (Platform.OS === 'ios') {
-            await new Promise(resolve => setTimeout(resolve, 300));
+          if (Platform.OS === "ios") {
+            await new Promise((resolve) => setTimeout(resolve, 300));
           }
-          
+
           return { type: "signin", message: "Signed in successfully" };
         } catch (signInError: any) {
           console.log("❌ Error en sign in directo:", signInError.code);
@@ -683,6 +692,103 @@ class FirebaseService {
     return !hasSignificantActivity;
   }
 
+  async cleanupInactiveAnonymousUsers(): Promise<{
+    deletedCount: number;
+    deletedUsers: Array<{
+      uid: string;
+      username: string;
+      lastActivity: string;
+    }>;
+  }> {
+    console.log("🧹 Iniciando limpieza manual de usuarios inactivos...");
+
+    try {
+      // Calcular fecha límite (24 horas atrás)
+      const cutoffTime = new Date();
+      cutoffTime.setHours(cutoffTime.getHours() - 24);
+      const cutoffISO = cutoffTime.toISOString();
+
+      console.log(
+        `🕐 Buscando usuarios anónimos inactivos desde: ${cutoffISO}`
+      );
+
+      // Buscar usuarios anónimos con lastActivity anterior a 24 horas
+      const usersQuery = query(
+        collection(firestore, "users"),
+        where("isAnonymous", "==", true),
+      );
+
+      const querySnapshot = await getDocs(usersQuery);
+      console.log(`👥 Encontrados ${querySnapshot.size} usuarios para revisar`);
+
+      const deletedUsers: Array<{
+        uid: string;
+        username: string;
+        lastActivity: string;
+      }> = [];
+
+      for (const docSnapshot of querySnapshot.docs) {
+        const userData = docSnapshot.data() as FirebaseUserProfile;
+        const uid = docSnapshot.id;
+
+        // Verificar si realmente debe eliminarse
+        if (this.shouldDeleteInactiveUser(userData)) {
+          try {
+            // Eliminar documento de Firestore
+            await deleteDoc(doc(firestore, "users", uid));
+
+            // Eliminar de Firebase Auth
+            // Nota: Esto requiere Firebase Admin SDK, por eso es mejor hacerlo con Cloud Functions
+            console.log(`🗑️ Usuario eliminado: ${userData.username} (${uid})`);
+
+            deletedUsers.push({
+              uid,
+              username: userData.username,
+              lastActivity: userData.lastActivity || "unknown",
+            });
+          } catch (deleteError) {
+            console.error(`❌ Error eliminando usuario ${uid}:`, deleteError);
+          }
+        } else {
+          console.log(
+            `📊 Conservando usuario con actividad: ${userData.username}`
+          );
+        }
+      }
+
+      console.log(
+        `🧹 Limpieza completada: ${deletedUsers.length} usuarios eliminados`
+      );
+
+      return {
+        deletedCount: deletedUsers.length,
+        deletedUsers,
+      };
+    } catch (error) {
+      console.error("❌ Error en limpieza de usuarios inactivos:", error);
+      throw error;
+    }
+  }
+
+  // 🧠 Determinar si un usuario inactivo debe eliminarse
+  private shouldDeleteInactiveUser(userData: FirebaseUserProfile): boolean {
+    // No eliminar si tiene actividad significativa
+    const hasSignificantActivity =
+      userData.gamesPlayed > 0 ||
+      userData.creed !== "" ||
+      userData.denomination !== "" ||
+      (userData.activityScore && userData.activityScore > 5) ||
+      userData.linkedWithEmail ||
+      userData.linkedWithGoogle;
+
+    // No eliminar si el username fue personalizado (no es auto-generado)
+    const hasCustomUsername =
+      userData.username &&
+      !userData.username.match(/^[A-Z][a-z]+[A-Z][a-z]+\d+$/);
+
+    return !hasSignificantActivity && !hasCustomUsername;
+  }
+
   async updateUserActivity(
     activityType: "game" | "profile_edit" | "login"
   ): Promise<void> {
@@ -703,7 +809,7 @@ class FirebaseService {
       };
 
       const updates: any = {
-        lastActivity: new Date().toISOString(),
+        lastActivity: new Date().toISOString(), // ✅ Siempre actualizar lastActivity
         activityScore: currentScore + scoreMap[activityType],
       };
 
@@ -714,10 +820,46 @@ class FirebaseService {
       }
 
       await updateDoc(doc(firestore, "users", currentUser.uid), updates);
+      console.log(`📈 Actividad actualizada: ${activityType}`);
     } catch (error) {
       if (__DEV__) {
         console.log("⚠️ No se pudo actualizar actividad:", error);
       }
+    }
+  }
+
+  async markAllAnonymousForCleanup(): Promise<void> {
+    if (!__DEV__) {
+      console.log("❌ Esta función solo está disponible en desarrollo");
+      return;
+    }
+
+    try {
+      console.log("🏷️ Marcando usuarios anónimos para limpieza...");
+
+      const usersQuery = query(
+        collection(firestore, "users"),
+        where("isAnonymous", "==", true)
+      );
+
+      const querySnapshot = await getDocs(usersQuery);
+
+      for (const docSnapshot of querySnapshot.docs) {
+        const userData = docSnapshot.data() as FirebaseUserProfile;
+
+        // Marcar como inactivo hace 25 horas para que sea elegible para limpieza
+        const oldActivity = new Date();
+        oldActivity.setHours(oldActivity.getHours() - 25);
+
+        await updateDoc(docSnapshot.ref, {
+          lastActivity: oldActivity.toISOString(),
+          markedForDeletion: true,
+        });
+      }
+
+      console.log(`🏷️ ${querySnapshot.size} usuarios marcados para limpieza`);
+    } catch (error) {
+      console.error("❌ Error marcando usuarios:", error);
     }
   }
 

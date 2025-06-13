@@ -13,20 +13,22 @@ const firebaseConfig = {
   measurementId: "G-WW150BQB39"
 };
 
-if (getApps().length === 0) {
-  console.log('🔥 Inicializando Firebase por primera vez...');
-} else {
-  console.log('🔥 Firebase ya inicializado, usando instancia existente');
+// ✅ Solo log si es la primera inicialización y estamos en desarrollo
+const isFirstInit = getApps().length === 0;
+if (__DEV__ && isFirstInit) {
+  console.log('🔥 Inicializando Firebase...');
 }
 
 // Inicializar Firebase solo una vez
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app = isFirstInit ? initializeApp(firebaseConfig) : getApps()[0];
 
 export const auth = getAuth(app);
 export const firestore = getFirestore(app);
 
-// Debug info simple
-console.log('🔥 Firebase inicializado correctamente');
+// ✅ Solo log una vez y en desarrollo
+if (__DEV__ && isFirstInit) {
+  console.log('✅ Firebase configurado correctamente');
+}
 
 export interface FirebaseUserProfile {
   uid: string;
